@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,11 +32,35 @@ import com.example.purrytify.ui.theme.SpotifyBlack
 import com.example.purrytify.ui.theme.SpotifyGreen
 @Composable
 fun LoginScreen(
-    onLoginClick: () -> Unit = {}
+    onLoginSuccess: () -> Unit = {},
+    viewModel: LoginViewModel = viewModel()
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+
+     var isLoading by remember { mutableStateOf(false) }
+    
+    val loginState by viewModel.loginState.collectAsState()
+
+    LaunchedEffect(loginState) {
+        when (loginState) {
+            is LoginState.Loading -> {
+                isLoading = true
+            }
+            is LoginState.Success -> {
+                isLoading = false
+                onLoginSuccess()
+            }
+            is LoginState.Error -> {
+                isLoading = false
+                // Show error snackbar or toast
+            }
+            else -> {
+                isLoading = false
+            }
+        }
+    }
 
     Box(
         modifier = Modifier.fillMaxSize()
@@ -77,13 +102,13 @@ fun LoginScreen(
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.height(300.dp))
+                Spacer(modifier = Modifier.height(200.dp))
 
                 Image(
                     painter = painterResource(id = R.drawable.intro),
                     contentDescription = "Purrytify Logo",
                     modifier = Modifier
-                        .size(200.dp)
+                        .size(160.dp)
                         .padding(bottom = 16.dp),
                     contentScale = ContentScale.Fit
                 )
@@ -171,16 +196,32 @@ fun LoginScreen(
 
                     // Login button
                     Button(
-                        onClick = onLoginClick,
+                        onClick = { viewModel.login(email, password) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
                         shape = RoundedCornerShape(15.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = SpotifyGreen
-                        )
+                        ),
+                        enabled = !isLoading && email.isNotBlank()
                     ) {
-                        Text("LOG IN", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                color = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        } else {
+                            Text("LOG IN", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    if (loginState is LoginState.Error) {
+                        Text(
+                            text = (loginState as LoginState.Error).message,
+                            color = Color.Red,
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
 
 
