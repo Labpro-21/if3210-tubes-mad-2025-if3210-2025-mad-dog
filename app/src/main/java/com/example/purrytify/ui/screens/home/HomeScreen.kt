@@ -24,67 +24,87 @@ import androidx.compose.ui.unit.sp
 import com.example.purrytify.R
 import com.example.purrytify.ui.theme.SpotifyBlack
 import com.example.purrytify.ui.theme.SpotifyGreen
+import com.example.purrytify.ui.components.BottomNavigationBar
+import androidx.compose.runtime.remember
+import androidx.compose.ui.tooling.preview.Preview
+import com.example.purrytify.ui.theme.PurrytifyTheme
 
 @Composable
-fun HomeScreen() {
+fun HomeScreen(
+    onNavigate: (String) -> Unit = {}
+) {
+    val currentRoute = "home"
+    
     Scaffold(
-        bottomBar = { BottomNavigationBar() },
-        containerColor = SpotifyBlack
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                TopBar()
-            }
-            
-            item {
-                Text(
-                    text = "Good evening",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
-            
-            item {
-                RecentlyPlayedSection()
-            }
-            
-            item {
-                Text(
-                    text = "Made for you",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                RecommendedPlaylistsSection()
-            }
-            
-            item {
-                Text(
-                    text = "Popular playlists",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                PopularPlaylistsSection()
-            }
-            
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-            }
+        containerColor = SpotifyBlack,
+        bottomBar = { 
+            BottomNavigationBar(
+                currentRoute = currentRoute,
+                onNavigate = onNavigate
+            ) 
         }
+    ) { paddingValues ->
+        HomeScreenContent(
+            modifier = Modifier.padding(paddingValues)
+        )
     }
 }
 
+@Composable
+fun HomeScreenContent(
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp)
+    ) {
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+            TopBar()
+        }
+
+        item {
+            Text(
+                text = "Good evening",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+        }
+
+        item {
+            RecentlyPlayedSection()
+        }
+
+        item {
+            Text(
+                text = "Made for you",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            RecommendedPlaylistsSection()
+        }
+
+        item {
+            Text(
+                text = "Popular playlists",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            PopularPlaylistsSection()
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
 @Composable
 fun TopBar() {
     Row(
@@ -216,44 +236,9 @@ fun PopularPlaylistsSection() {
     }
 }
 
-@Composable
-fun BottomNavigationBar() {
-    NavigationBar(
-        containerColor = Color(0xFF121212),
-        contentColor = Color.White,
-    ) {
-        NavigationBarItem(
-            icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
-            label = { Text("Home") },
-            selected = true,
-            onClick = { },
-            colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = SpotifyGreen,
-                selectedTextColor = SpotifyGreen,
-                indicatorColor = Color(0xFF121212)
-            )
-        )
-        NavigationBarItem(
-            icon = { Icon(Icons.Default.Search, contentDescription = "Search") },
-            label = { Text("Search") },
-            selected = false,
-            onClick = { },
-            colors = NavigationBarItemDefaults.colors(
-                unselectedIconColor = Color.Gray,
-                unselectedTextColor = Color.Gray,
-                indicatorColor = Color(0xFF121212)
-            )
-        )
-        NavigationBarItem(
-            icon = { Icon(painter = painterResource(id = R.drawable.bg), contentDescription = "Library") },
-            label = { Text("Library") },
-            selected = false,
-            onClick = { },
-            colors = NavigationBarItemDefaults.colors(
-                unselectedIconColor = Color.Gray,
-                unselectedTextColor = Color.Gray,
-                indicatorColor = Color(0xFF121212)
-            )
-        )
+@Composable   @Preview
+fun HomeScreenPreview() {
+    PurrytifyTheme {
+        HomeScreen()
     }
 }

@@ -21,6 +21,7 @@ import com.example.purrytify.ui.screens.home.HomeScreen
 import com.example.purrytify.ui.screens.login.LoginScreen
 import com.example.purrytify.ui.theme.PurrytifyTheme
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.purrytify.ui.navigation.AppNavigation
 
 
 class MainActivity : ComponentActivity() {
@@ -35,7 +36,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AppNavigation()
+                    AppSelector()
                 }
             }
         }
@@ -43,11 +44,11 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppNavigation(viewModel: MainViewModel = viewModel()) {
+fun AppSelector(viewModel: MainViewModel = viewModel()) {
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
 
     if (isLoggedIn) {
-        HomeScreen()
+        AppNavigation()
     } else {
         LoginScreen(
             onLoginSuccess = {
@@ -62,13 +63,5 @@ fun AppNavigation(viewModel: MainViewModel = viewModel()) {
 fun LoginScreenPreview() {
     PurrytifyTheme {
         LoginScreen()
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun HomeScreenPreview() {
-    PurrytifyTheme {
-        HomeScreen()
     }
 }
