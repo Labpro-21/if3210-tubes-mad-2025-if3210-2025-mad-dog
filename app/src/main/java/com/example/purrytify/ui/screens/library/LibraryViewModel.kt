@@ -12,6 +12,8 @@ import com.example.purrytify.db.AppDatabase
 import com.example.purrytify.db.entity.Songs
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
 
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -24,10 +26,20 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     fun addSong(song: Songs, uri: Uri?, artworkUri: Uri?) {
         viewModelScope.launch {
             if (uri != null && isAudioFile(uri)) {
-                val duration = getAudioDuration(uri,context)
+                val audioFilePath = copyAudioToInternalStorage(uri)
+                if (audioFilePath != null) {
+                    val duration = getAudioDuration(Uri.fromFile(File(audioFilePath)), context) // use the new path to get duration
+                    var artworkFilePath: String? = null
 
-                val newSong = song.copy(duration = duration, filePath = uri.toString(), artwork = artworkUri.toString())
-                songDao.insert(newSong)
+                    if (artworkUri != null) {
+                        artworkFilePath = copyArtworkToInternalStorage(artworkUri)
+                    }
+
+                    val newSong = song.copy(duration = duration, filePath = audioFilePath, artwork = artworkFilePath ?: "")
+                    songDao.insert(newSong)
+                } else {
+                    Toast.makeText(context, "Error copying audio file.", Toast.LENGTH_SHORT).show()
+                }
             } else {
                 Toast.makeText(context, "Please select a valid audio file.", Toast.LENGTH_SHORT).show()
             }
@@ -72,7 +84,6 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-
     fun getMetadata(uri: Uri?): Pair<String?, String?> {
         if (uri == null) return Pair(null, null)
 
@@ -99,4 +110,28 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         return Pair(title, artist)
     }
 
+    private fun copyArtworkToInternalStorage(artworkUri: Uri): String? {
+        val inputStream = context.contentResolver.openInputStream(artworkUri) ?: return null
+        val fileName = "artwork_${System.currentTimeMillis()}.jpg"
+        val file = File(context.filesDir, fileName)
+        val outputStream = FileOutputStream(file)
+
+        inputStream.copyTo(outputStream)
+        inputStream.close()
+        outputStream.close()
+
+        return file.absolutePath
+    }
+    private fun copyAudioToInternalStorage(audioUri: Uri): String? {
+        val inputStream = context.contentResolver.openInputStream(audioUri) ?: return null
+        val fileName = "audio_${System.currentTimeMillis()}.mp3" // Ensure to use the correct extension
+        val file = File(context.filesDir, fileName)
+        val outputStream = FileOutputStream(file)
+
+        inputStream.copyTo(outputStream)
+        inputStream.close()
+        outputStream.close()
+
+        return file.absolutePath
+    }
 }
