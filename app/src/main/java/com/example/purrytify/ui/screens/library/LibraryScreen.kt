@@ -1,5 +1,9 @@
 package com.example.purrytify.ui.screens.library
 
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -22,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -30,11 +35,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.purrytify.R
 import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.ui.theme.PurrytifyTheme
-import com.example.purrytify.ui.screens.library.LibraryViewModel
+
 @Composable
 fun LibraryScreen(libraryViewModel: LibraryViewModel = viewModel()) {
     var showAllSongs by remember { mutableStateOf(true) }
@@ -97,7 +104,8 @@ fun LibraryScreen(libraryViewModel: LibraryViewModel = viewModel()) {
                 content = {
                     AddSongDialogContent(
                         onDismiss = { showAddSongDialog = false },
-                        onAddSong = { song -> libraryViewModel.addSong(song) }
+                        libraryViewModel = libraryViewModel
+
                     )
                 }
             )
@@ -112,14 +120,33 @@ fun SongItem(song: Songs, libraryViewModel: LibraryViewModel) {
             .fillMaxWidth()
             .padding(vertical = 8.dp)
             .clickable { libraryViewModel.toggleFavoriteStatus(song) },
-        horizontalArrangement = Arrangement.SpaceBetween
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column {
+        val context = LocalContext.current
+        val imageUri = song.artwork?.let { Uri.parse(it) }
+
+        Image(
+            painter = rememberAsyncImagePainter(
+                ImageRequest.Builder(context).data(data = imageUri).apply(block = fun ImageRequest.Builder.() {
+                    crossfade(true)
+                }).build()
+            ),
+            contentDescription = "Artist Artwork",
+            modifier = Modifier
+                .size(60.dp)
+                .clip(RoundedCornerShape(8.dp)),
+            contentScale = ContentScale.Crop
+        )
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
             Text(text = song.name, fontWeight = FontWeight.Bold, color = Color.White)
             Text(text = song.artist, fontSize = 12.sp, color = Color.Gray)
-            Text(text = song.description, fontSize = 12.sp, color = Color.LightGray)
-            Text(text = "Duration: ${song.duration / 1000} seconds", fontSize = 12.sp, color = Color.White)
+            //Text(text = song.duration.toString(), fontSize = 12.sp, color = Color.Gray)
+
         }
+
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = if (song.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
@@ -135,6 +162,9 @@ fun SongItem(song: Songs, libraryViewModel: LibraryViewModel) {
         }
     }
 }
+
+
+
 @Composable
 fun SlideUpDialog(onDismiss: () -> Unit, content: @Composable () -> Unit) {
     val density = LocalDensity.current
@@ -164,11 +194,28 @@ fun SlideUpDialog(onDismiss: () -> Unit, content: @Composable () -> Unit) {
     }
 }
 @Composable
-fun AddSongDialogContent(onDismiss: () -> Unit, onAddSong: (Songs) -> Unit) {
+fun AddSongDialogContent(onDismiss: () -> Unit, libraryViewModel: LibraryViewModel) {
     var title by remember { mutableStateOf("") }
     var artist by remember { mutableStateOf("") }
-    // Add states for photo and file uploads if needed
+    var photoUri by remember { mutableStateOf<Uri?>(null) }
+    var fileUri by remember { mutableStateOf<Uri?>(null) }
+    val context = LocalContext.current
 
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        photoUri = uri
+    }
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        fileUri = uri
+        if (fileUri != null) {
+            val metadata = libraryViewModel.getMetadata(fileUri)
+            title = metadata.first ?: ""
+            artist = metadata.second ?: ""
+        }
+    }
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -186,13 +233,13 @@ fun AddSongDialogContent(onDismiss: () -> Unit, onAddSong: (Songs) -> Unit) {
         ) {
             UploadButton(
                 text = "Upload Photo",
-                icon = R.drawable.ic_image, // Replace with your image resource
-                onClick = { /* Handle photo upload */ }
+                icon = R.drawable.ic_image,
+                onClick = { photoPickerLauncher.launch("image/*")}
             )
             UploadButton(
-                text = "Upload File",
-                icon = R.drawable.ic_file, // Replace with your file icon resource
-                onClick = { /* Handle file upload */ }
+                text = "Upload Audio File",
+                icon = R.drawable.ic_file,
+                onClick = { filePickerLauncher.launch("audio/*") }
             )
         }
 
@@ -229,15 +276,15 @@ fun AddSongDialogContent(onDismiss: () -> Unit, onAddSong: (Songs) -> Unit) {
 
             Button(
                 onClick = {
-                    onAddSong(
-                        Songs(
-                            name = title,
-                            artist = artist,
-                            description = "",
-                            filePath = "",
-                            artwork = "",
-                            duration = 0L
-                        )
+                    if (fileUri == null) {
+                        Toast.makeText(context, "Please select a file.", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+
+                    libraryViewModel.addSong(
+                        Songs(name = title, artist = artist, description = "", filePath = "", artwork = "", duration = 0L),
+                        fileUri,
+                        photoUri
                     )
                     onDismiss()
                 },
@@ -277,12 +324,5 @@ fun UploadButton(text: String, icon: Int, onClick: () -> Unit) {
             modifier = Modifier.size(16.dp),
             tint = MaterialTheme.colorScheme.primary
         )
-    }
-}
-@Preview
-@Composable
-fun LibraryScreenPreview() {
-    PurrytifyTheme {
-        LibraryScreen()
     }
 }
