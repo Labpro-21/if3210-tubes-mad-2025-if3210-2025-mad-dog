@@ -1,5 +1,6 @@
 package com.example.purrytify.ui.screens.login
 
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -43,21 +44,17 @@ fun LoginScreen(
     
     val loginState by viewModel.loginState.collectAsState()
 
+
     LaunchedEffect(loginState) {
-        when (loginState) {
-            is LoginState.Loading -> {
-                isLoading = true
-            }
-            is LoginState.Success -> {
-                isLoading = false
+        Log.d("LoginScreen", "Login state: $loginState")
+
+        if (loginState is LoginState.Success) {
+            Log.d("LoginScreen", "Login success detected, checking if it was user-initiated")
+            if (viewModel.isUserInitiatedLogin) {
+                Log.d("LoginScreen", "User initiated login, triggering success callback")
                 onLoginSuccess()
-            }
-            is LoginState.Error -> {
-                isLoading = false
-                // Show error snackbar or toast
-            }
-            else -> {
-                isLoading = false
+            } else {
+                Log.d("LoginScreen", "Automatic login detected, not triggering callback")
             }
         }
     }

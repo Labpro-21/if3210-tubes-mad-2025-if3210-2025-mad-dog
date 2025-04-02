@@ -1,48 +1,87 @@
 package com.example.purrytify.data.auth
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "auth_prefs")
+private val Context.authDataStore: DataStore<Preferences> by preferencesDataStore(name = "auth_prefs")
 
-class TokenManager(private val context: Context) {
-    
-    companion object {
-        private val JWT_TOKEN_KEY = stringPreferencesKey("jwt_token")
-        private val REFRESH_TOKEN_KEY = stringPreferencesKey("refresh_token")
+class TokenManager private constructor(private val context: Context) {
+
+    private object PreferencesKeys {
+        val ACCESS_TOKEN = stringPreferencesKey("access_token")
+        val REFRESH_TOKEN = stringPreferencesKey("refresh_token")
     }
-    
-    // Get the JWT token
-    val tokenFlow: Flow<String?> = context.dataStore.data
-        .map { preferences ->
-            preferences[JWT_TOKEN_KEY]
-        }
-    
-    // Get the refresh token
-    val refreshTokenFlow: Flow<String?> = context.dataStore.data
-        .map { preferences ->
-            preferences[REFRESH_TOKEN_KEY]
-        }
-    
-    // Save tokens to DataStore
-    suspend fun saveTokens(jwtToken: String, refreshToken: String) {
-        context.dataStore.edit { preferences ->
-            preferences[JWT_TOKEN_KEY] = jwtToken
-            preferences[REFRESH_TOKEN_KEY] = refreshToken
+
+    val accessTokenFlow: Flow<String?> = context.authDataStore.data.map { preferences ->
+        preferences[PreferencesKeys.ACCESS_TOKEN]
+    }
+
+    val refreshTokenFlow: Flow<String?> = context.authDataStore.data.map { preferences ->
+        preferences[PreferencesKeys.REFRESH_TOKEN]
+    }
+
+    private val _tokenFlow = MutableStateFlow<String?>(null)
+    val tokenFlow: StateFlow<String?> = _tokenFlow
+
+    init {
+        try {
+            kotlinx.coroutines.runBlocking {
+                _tokenFlow.value = accessTokenFlow.first()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error initializing token flow: ${e.message}", e)
         }
     }
-    
-    // Clear all tokens (for logout)
+
+
+    suspend fun saveTokens(accessToken: String, refreshToken: String) {
+        context.authDataStore.edit { preferences ->
+            preferences[PreferencesKeys.ACCESS_TOKEN] = accessToken
+            preferences[PreferencesKeys.REFRESH_TOKEN] = refreshToken
+        }
+        _tokenFlow.value = accessToken
+        Log.d(TAG, "Tokens saved to DataStore")
+    }
+
+
     suspend fun clearTokens() {
-        context.dataStore.edit { preferences ->
-            preferences.remove(JWT_TOKEN_KEY)
-            preferences.remove(REFRESH_TOKEN_KEY)
+        context.authDataStore.edit { preferences ->
+            preferences.remove(PreferencesKeys.ACCESS_TOKEN)
+            preferences.remove(PreferencesKeys.REFRESH_TOKEN)
+        }
+        _tokenFlow.value = null
+        Log.d(TAG, "Tokens cleared from DataStore")
+    }
+
+
+    suspend fun getAccessToken(): String? {
+        return accessTokenFlow.first()
+    }
+    
+    suspend fun getRefreshToken(): String? {
+        return refreshTokenFlow.first()
+    }
+
+    companion object {
+        private const val TAG = "TokenManager"
+
+        @Volatile
+        private var INSTANCE: TokenManager? = null
+
+        fun getInstance(context: Context): TokenManager {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: TokenManager(context.applicationContext).also { INSTANCE = it }
+            }
         }
     }
 }

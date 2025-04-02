@@ -1,13 +1,18 @@
 package com.example.purrytify
 
 import android.app.Application
-import com.example.purrytify.services.TokenServiceManager
+import android.util.Log
+import com.example.purrytify.data.auth.AuthRepository
+import com.example.purrytify.data.auth.TokenManager
 
 class PurrytifyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        
-        // Start the token validation service
-        TokenServiceManager.startTokenValidationService(this)
+
+        // Initialize singletons
+        TokenManager.getInstance(this)
+        AuthRepository.getInstance(this)
+
+        Log.d("PurrytifyApp", "Application initialized")
     }
 }

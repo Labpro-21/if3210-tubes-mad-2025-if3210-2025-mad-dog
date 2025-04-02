@@ -14,35 +14,47 @@ import com.example.purrytify.ui.components.BottomNavigationBar
 import com.example.purrytify.ui.screens.home.HomeScreenContent
 import com.example.purrytify.ui.screens.library.LibraryScreen
 import com.example.purrytify.ui.screens.profile.ProfileScreen
+import com.example.purrytify.ui.screens.setting.SettingScreen
 import com.example.purrytify.ui.theme.SpotifyBlack
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
     object Library : Screen("library")
     object Profile : Screen("profile")
+    object Settings : Screen("settings")
 }
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(
+    onLogout: () -> Unit = {}
+) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: Screen.Home.route
 
+    //
+    val showBottomBar = when (currentRoute) {
+        Screen.Home.route, Screen.Library.route, Screen.Profile.route -> true
+        else -> false
+    }
+
     Scaffold(
         containerColor = SpotifyBlack,
         bottomBar = {
-            BottomNavigationBar(
-                currentRoute = currentRoute,
-                onNavigate = { route ->
-                    navController.navigate(route) {
-                        popUpTo(Screen.Home.route) {
-                            saveState = true
+            if (showBottomBar) {
+                BottomNavigationBar(
+                    currentRoute = currentRoute,
+                    onNavigate = { route ->
+                        navController.navigate(route) {
+                            popUpTo(Screen.Home.route) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
                         }
-                        launchSingleTop = true
-                        restoreState = true
                     }
-                }
-            )
+                )
+            }
         }
     ) { innerPadding ->
         NavHost(
@@ -57,7 +69,19 @@ fun AppNavigation() {
                 LibraryScreen()
             }
             composable(Screen.Profile.route) {
-                ProfileScreen()
+                ProfileScreen(
+                    onNavigateToSettings = {
+                        navController.navigate(Screen.Settings.route)
+                    }
+                )
+            }
+            composable(Screen.Settings.route) {
+                SettingScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    },
+                    onLogout = onLogout
+                )
             }
         }
     }
