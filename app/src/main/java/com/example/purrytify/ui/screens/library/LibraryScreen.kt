@@ -1,7 +1,7 @@
+// LibraryScreen.kt
+
 package com.example.purrytify.ui.screens.library
 
-import android.app.Application
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -10,30 +10,31 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,93 +43,122 @@ import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import com.example.purrytify.R
-import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.db.entity.Songs
-import com.example.purrytify.ui.theme.PurrytifyTheme
+import com.example.purrytify.utils.MediaUtils
+import kotlinx.coroutines.launch
 import java.io.File
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LibraryScreen(libraryViewModel: LibraryViewModel = viewModel(),navController: NavController) {
+fun LibraryScreen(libraryViewModel: LibraryViewModel = viewModel(), navController: NavController) {
     var showAllSongs by remember { mutableStateOf(true) }
     var showAddSongDialog by remember { mutableStateOf(false) }
-
-
-    val songsFlow = if (showAllSongs) {
-        libraryViewModel.allSongs.collectAsState(initial = emptyList()).value
-    } else {
-        libraryViewModel.favoriteSongs.collectAsState(initial = emptyList()).value
-    }
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState()
+    val userId = libraryViewModel.userId
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Library",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+        if (userId == null) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Button(
-                    onClick = { showAllSongs = true },
-                    modifier = Modifier.padding(8.dp)
+                Text(
+                    text = "Anda belum login",
+                    fontSize = 18.sp,
+                    color = Color.White
+                )
+            }
+        } else {
+            val songsFlow = if (showAllSongs) {
+                libraryViewModel.allSongs.collectAsState(initial = emptyList()).value
+            } else {
+                libraryViewModel.favoriteSongs.collectAsState(initial = emptyList()).value
+            }
+
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = "Show All Songs")
+                    Text(
+                        text = "Library",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+
+                    IconButton(
+                        onClick = { showAddSongDialog = true },
+                        modifier = Modifier.align(Alignment.CenterVertically)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Add Song")
+                    }
                 }
 
-                Button(
-                    onClick = { showAllSongs = false },
-                    modifier = Modifier.padding(8.dp)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(text = "Show Liked Songs")
+                    Button(
+                        onClick = { showAllSongs = true },
+                        modifier = Modifier.padding(8.dp)
+                    ) {
+                        Text(text = "Show All Songs")
+                    }
+
+                    Button(
+                        onClick = { showAllSongs = false },
+                        modifier = Modifier.padding(8.dp)
+                    ) {
+                        Text(text = "Show Liked Songs")
+                    }
                 }
 
-                IconButton(
-                    onClick = { showAddSongDialog = true }
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add Song")
+                Spacer(modifier = Modifier.height(16.dp))
+
+                LazyColumn {
+                    items(songsFlow) { song ->
+                        SongItem(song, onNavigate = { route -> navController.navigate(route) })
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            LazyColumn {
-                items(songsFlow) { song ->
-                    SongItem(song,  onNavigate = {route -> navController.navigate(route)})
-                }
-            }
-        }
-
-        if (showAddSongDialog) {
-            SlideUpDialog(
-                onDismiss = { showAddSongDialog = false },
-                content = {
+            if (showAddSongDialog) {
+                ModalBottomSheet(
+                    onDismissRequest = { showAddSongDialog = false },
+                    sheetState = sheetState
+                ) {
                     AddSongDialogContent(
-                        onDismiss = { showAddSongDialog = false },
+                        onDismiss = {
+                            scope.launch { sheetState.hide() }.invokeOnCompletion {
+                                if (!sheetState.isVisible) {
+                                    showAddSongDialog = false
+                                }
+                            }
+                        },
                         libraryViewModel = libraryViewModel
                     )
                 }
-            )
+            }
         }
     }
 }
+
 @Composable
-fun SongItem(song: Songs,onNavigate: (String) -> Unit) {
+fun SongItem(song: Songs, onNavigate: (String) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
             .clickable {
-            onNavigate("songDetails/${song.id}")
-    },
-
+                onNavigate("songDetails/${song.id}")
+            },
         verticalAlignment = Alignment.CenterVertically
     ) {
         val context = LocalContext.current
@@ -153,9 +183,6 @@ fun SongItem(song: Songs,onNavigate: (String) -> Unit) {
             Text(text = song.name, fontWeight = FontWeight.Bold, color = Color.White)
             Text(text = song.artist, fontSize = 12.sp, color = Color.Gray)
         }
-
-
-
     }
 }
 
@@ -178,7 +205,7 @@ fun SlideUpDialog(onDismiss: () -> Unit, content: @Composable () -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .offset { IntOffset(0, offsetY.value.toInt()) }
-                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)) // Rounded corners at the top
+                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                 .background(MaterialTheme.colorScheme.surface)
                 .padding(16.dp)
                 .align(Alignment.BottomCenter)
@@ -187,12 +214,14 @@ fun SlideUpDialog(onDismiss: () -> Unit, content: @Composable () -> Unit) {
         }
     }
 }
+
 @Composable
 fun AddSongDialogContent(onDismiss: () -> Unit, libraryViewModel: LibraryViewModel) {
     var title by remember { mutableStateOf("") }
     var artist by remember { mutableStateOf("") }
     var photoUri by remember { mutableStateOf<Uri?>(null) }
     var fileUri by remember { mutableStateOf<Uri?>(null) }
+    var uploadSuccess by remember { mutableStateOf(false) } // Indikator keberhasilan
     val context = LocalContext.current
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -205,13 +234,16 @@ fun AddSongDialogContent(onDismiss: () -> Unit, libraryViewModel: LibraryViewMod
     ) { uri: Uri? ->
         fileUri = uri
         if (fileUri != null) {
-            val metadata = libraryViewModel.getMetadata(fileUri)
+            val metadata = MediaUtils.getMetadata(fileUri,context)
             title = metadata.first ?: ""
             artist = metadata.second ?: ""
         }
     }
+
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
@@ -228,12 +260,14 @@ fun AddSongDialogContent(onDismiss: () -> Unit, libraryViewModel: LibraryViewMod
             UploadButton(
                 text = "Upload Photo",
                 icon = R.drawable.ic_image,
-                onClick = { photoPickerLauncher.launch("image/*")}
+                onClick = { photoPickerLauncher.launch("image/*") },
+                isSelected = photoUri != null
             )
             UploadButton(
-                text = "Upload Audio File",
+                text = "Upload File",
                 icon = R.drawable.ic_file,
-                onClick = { filePickerLauncher.launch("audio/*") }
+                onClick = { filePickerLauncher.launch("audio/*") },
+                isSelected = fileUri != null
             )
         }
 
@@ -274,13 +308,8 @@ fun AddSongDialogContent(onDismiss: () -> Unit, libraryViewModel: LibraryViewMod
                         Toast.makeText(context, "Please select a file.", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
-
-                    libraryViewModel.addSong(
-                        fileUri,
-                        photoUri,
-                        title,
-                        artist
-                    )
+                    libraryViewModel.addSong(fileUri, photoUri, title, artist)
+                    uploadSuccess = true
                     onDismiss()
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
@@ -288,36 +317,70 @@ fun AddSongDialogContent(onDismiss: () -> Unit, libraryViewModel: LibraryViewMod
                 Text("Save")
             }
         }
+
+        if (uploadSuccess) {
+            Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = "Upload Successful",
+                tint = Color.Green,
+                modifier = Modifier.padding(top = 16.dp)
+            )
+        }
     }
 }
+
 @Composable
-fun UploadButton(text: String, icon: Int, onClick: () -> Unit) {
-    Column(
+fun UploadButton(text: String, icon: Int, onClick: () -> Unit, isSelected: Boolean) {
+    Box(
         modifier = Modifier
             .width(120.dp)
             .height(100.dp)
-            .border(1.dp, Color.Gray, RoundedCornerShape(8.dp))
+            .drawDashedBorder(color = Color.Gray, dashWidth = 10f, gapWidth = 10f)
             .clickable(onClick = onClick)
             .padding(8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        contentAlignment = Alignment.Center
     ) {
-        Image(
-            painter = painterResource(id = icon),
-            contentDescription = null,
-            modifier = Modifier.size(40.dp),
-            contentScale = ContentScale.Fit
-        )
-        Text(
-            text = text,
-            style = TextStyle(fontSize = 14.sp),
-            modifier = Modifier.padding(top = 8.dp)
-        )
-        Icon(
-            imageVector = Icons.Default.AttachFile,
-            contentDescription = null,
-            modifier = Modifier.size(16.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = text,
+                style = TextStyle(fontSize = 14.sp, color = Color.Gray),
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            Image(
+                painter = painterResource(id = icon),
+                contentDescription = null,
+                modifier = Modifier.size(40.dp),
+                contentScale = ContentScale.Fit
+            )
+        }
+        if (isSelected) {
+            Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = "Selected",
+                tint = Color.Green,
+                modifier = Modifier.align(Alignment.BottomEnd)
+            )
+        }
     }
 }
+
+fun Modifier.drawDashedBorder(color: Color, dashWidth: Float, gapWidth: Float): Modifier = this.then(
+    Modifier.drawBehind {
+        val strokeWidth = 1.dp.toPx()
+        val width = size.width
+        val height = size.height
+        val cornerRadius = CornerRadius(8.dp.toPx(), 8.dp.toPx())
+
+        drawRoundRect(
+            color = color,
+            style = Stroke(
+                width = strokeWidth,
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(dashWidth, gapWidth), 0f)
+            ),
+            cornerRadius = cornerRadius
+        )
+    }
+)
