@@ -5,7 +5,8 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.purrytify.data.auth.AuthRepository
-import com.example.purrytify.data.auth.TokenManager
+import com.example.purrytify.db.AppDatabase
+import com.example.purrytify.db.entity.Users
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -13,6 +14,7 @@ import kotlinx.coroutines.launch
 class LoginViewModel(application: Application) : AndroidViewModel(application) {
 
     private val authRepository = AuthRepository.getInstance(application)
+    private val usersDao = AppDatabase.getDatabase(application).usersDao()
 
     private val _loginState = MutableStateFlow<LoginState>(LoginState.Idle)
     val loginState: StateFlow<LoginState> = _loginState
@@ -59,12 +61,32 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
             authRepository.login(email, password)
                 .onSuccess {
                     Log.d("LoginViewModel", "Login successful")
+                    insertOrUpdateUser() // Insert atau update user setelah login berhasil
                     _loginState.value = LoginState.Success
                 }
                 .onFailure { error ->
                     Log.e("LoginViewModel", "Login failed: ${error.message}")
                     _loginState.value = LoginState.Error(error.message ?: "Unknown error")
                     _isUserInitiatedLogin = false
+                }
+        }
+    }
+
+    private fun insertOrUpdateUser() {
+        viewModelScope.launch {
+            authRepository.verifyToken()
+                .onSuccess { userData ->
+                    val existingUser = usersDao.getUserById(userData.user.id)
+                    if (existingUser == null) {
+                        val newUser = Users(id = userData.user.id, name = userData.user.username)
+                        usersDao.insertUser(newUser)
+                        Log.d("LoginViewModel", "User inserted: ${userData.user.id}, ${userData.user.username}")
+                    } else {
+                        Log.d("LoginViewModel", "User already exists: ${userData.user.id}, ${userData.user.username}")
+                    }
+                }
+                .onFailure { error ->
+                    Log.e("LoginViewModel", "Failed to get user data from token: ${error.message}")
                 }
         }
     }

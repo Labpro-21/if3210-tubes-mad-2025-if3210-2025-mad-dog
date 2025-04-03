@@ -5,6 +5,7 @@ import android.util.Log
 import com.example.purrytify.data.api.NetworkModule
 import com.example.purrytify.data.model.LoginRequest
 import com.example.purrytify.data.model.RefreshTokenRequest
+import com.example.purrytify.data.model.VerifyTokenResponse
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,6 +19,10 @@ class AuthRepository private constructor(
     // Auth state untuk tracking status
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
     val authState: StateFlow<AuthState> = _authState
+
+    // Menyimpan ID pengguna yang sedang login
+    var currentUserId: Int? = null
+        private set
 
     suspend fun login(email: String, password: String): Result<Boolean> {
         return try {
@@ -48,6 +53,7 @@ class AuthRepository private constructor(
             _authState.value = AuthState.Loading
 
             tokenManager.clearTokens()
+            currentUserId = null // Reset ID pengguna saat logout
 
             delay(300)
 
@@ -76,7 +82,7 @@ class AuthRepository private constructor(
         return isLoggedIn
     }
 
-    suspend fun verifyToken(): Result<Boolean> {
+    suspend fun verifyToken(): Result<VerifyTokenResponse> {
         Log.d(TAG, "Verifying token")
         return try {
             val token = tokenManager.getAccessToken()
@@ -88,23 +94,29 @@ class AuthRepository private constructor(
             if (response.isSuccessful) {
                 Log.d(TAG, "Token verification successful")
                 _authState.value = AuthState.Authenticated
-                Result.success(true)
+                response.body()?.let { verifyTokenResponse ->
+                    // Set currentUserId setelah verifikasi token berhasil
+                    currentUserId = verifyTokenResponse.user.id
+                    return Result.success(verifyTokenResponse)
+                } ?: run {
+                    return Result.failure(Exception("Empty response body"))
+                }
             } else {
                 val errorMessage = "Token verification failed: ${response.code()} ${response.message()}"
                 Log.d(TAG, errorMessage)
 
                 if (response.code() == 401) {
                     _authState.value = AuthState.Error("Token expired")
-                    Result.failure(Exception("Token expired"))
+                    return Result.failure(Exception("Token expired"))
                 } else {
                     _authState.value = AuthState.Error(errorMessage)
-                    Result.failure(Exception(errorMessage))
+                    return Result.failure(Exception(errorMessage))
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error verifying token: ${e.message}", e)
             _authState.value = AuthState.Error(e.message ?: "Unknown error during token verification")
-            Result.failure(e)
+            return Result.failure(e)
         }
     }
 

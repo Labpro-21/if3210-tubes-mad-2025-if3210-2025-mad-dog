@@ -43,6 +43,7 @@ import coil.request.ImageRequest
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.purrytify.R
+import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.ui.theme.PurrytifyTheme
 import java.io.File
@@ -51,6 +52,7 @@ import java.io.File
 fun LibraryScreen(libraryViewModel: LibraryViewModel = viewModel()) {
     var showAllSongs by remember { mutableStateOf(true) }
     var showAddSongDialog by remember { mutableStateOf(false) }
+
 
     val songsFlow = if (showAllSongs) {
         libraryViewModel.allSongs.collectAsState(initial = emptyList()).value
@@ -309,9 +311,10 @@ fun AddSongDialogContent(onDismiss: () -> Unit, libraryViewModel: LibraryViewMod
                     }
 
                     libraryViewModel.addSong(
-                        Songs(name = title, artist = artist, description = "", filePath = "", artwork = "", duration = 0L),
                         fileUri,
-                        photoUri
+                        photoUri,
+                        title,
+                        artist
                     )
                     onDismiss()
                 },

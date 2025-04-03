@@ -8,6 +8,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.db.AppDatabase
 import com.example.purrytify.db.entity.Songs
 import kotlinx.coroutines.flow.Flow
@@ -19,24 +20,53 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     private val songDao = AppDatabase.getDatabase(application).songsDao()
     private val context = application.applicationContext
+    private val authRepository = AuthRepository.getInstance(application)
 
-    val allSongs: Flow<List<Songs>> = songDao.getAllSongs()
-    val favoriteSongs: Flow<List<Songs>> = songDao.getFavoriteSongs()
 
-    fun addSong(song: Songs, uri: Uri?, artworkUri: Uri?) {
+    val userId: Int?
+        get() = authRepository.currentUserId
+
+    val allSongs: Flow<List<Songs>>
+        get() {
+            val userId = this.userId
+            return if (userId != null) {
+                songDao.getAllSongsForUser(userId)
+            } else {
+                songDao.getAllSongs()
+            }
+        }
+
+    val favoriteSongs: Flow<List<Songs>>
+        get() {
+            val userId = this.userId
+            return if (userId != null) {
+                songDao.getFavoriteSongsForUser(userId)
+            } else {
+                songDao.getFavoriteSongs()
+            }
+        }
+
+    fun addSong( uri: Uri?, artworkUri: Uri?,title: String, artist:String) {
+        val userId = authRepository.currentUserId
+
+        if (userId == null) {
+            Toast.makeText(context, "You must be logged in to add songs.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         viewModelScope.launch {
             if (uri != null && isAudioFile(uri)) {
                 val audioFilePath = copyAudioToInternalStorage(uri)
                 if (audioFilePath != null) {
-                    val duration = getAudioDuration(Uri.fromFile(File(audioFilePath)), context) // use the new path to get duration
+                    val duration = getAudioDuration(Uri.fromFile(File(audioFilePath)), context)
                     var artworkFilePath: String? = null
 
                     if (artworkUri != null) {
                         artworkFilePath = copyArtworkToInternalStorage(artworkUri)
                     }
 
-                    val newSong = song.copy(duration = duration, filePath = audioFilePath, artwork = artworkFilePath ?: "")
-                    songDao.insert(newSong)
+                    val newSong = Songs(artist= artist,name= title, description = "", userId = userId, duration = duration, filePath = audioFilePath, artwork = artworkFilePath ?: "") // Use userId
+                    songDao.insertSong(newSong)
                 } else {
                     Toast.makeText(context, "Error copying audio file.", Toast.LENGTH_SHORT).show()
                 }

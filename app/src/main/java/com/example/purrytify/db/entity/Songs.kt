@@ -1,17 +1,29 @@
 package com.example.purrytify.db.entity
 
 import androidx.room.Entity
+import androidx.room.ForeignKey
 import androidx.room.PrimaryKey
+import androidx.room.Index
 
-@Entity(tableName = "songs")
+@Entity(
+    tableName = "songs",
+    foreignKeys = [ForeignKey(
+        entity = Users::class,
+        parentColumns = ["id"],
+        childColumns = ["userId"],
+        onDelete = ForeignKey.CASCADE
+    )],
+    indices = [Index(value = ["userId"])] // Improves query performance
+)
 data class Songs(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
+    val userId: Int,  // Foreign key reference to Users table
     val name: String,
     val artist: String,
     val description: String,
     val isFavorite: Boolean = false,
-    val filePath: String, // Path ke file audio
-    val artwork: String? = null, // Path atau URL ke artwork lagu
-    val duration: Long // Durasi lagu dalam milidetik
+    val filePath: String,
+    val artwork: String? = null,
+    val duration: Long
 )
