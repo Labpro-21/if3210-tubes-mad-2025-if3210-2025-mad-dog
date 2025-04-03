@@ -3,6 +3,10 @@
 package com.example.purrytify.ui.screens.songdetail
 
 import android.graphics.drawable.BitmapDrawable
+import android.media.MediaPlayer
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -10,32 +14,24 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,18 +41,19 @@ import coil.request.ImageRequest
 import com.example.purrytify.db.entity.Songs
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import androidx.palette.graphics.Palette
 import coil.imageLoader
 import com.example.purrytify.ui.theme.SpotifyBlack
-import com.example.purrytify.ui.theme.SpotifyDarkGray
 import com.example.purrytify.ui.theme.SpotifyLightGray
-import com.example.purrytify.ui.theme.SpotifyWhite
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import com.example.purrytify.R
+import com.example.purrytify.ui.screens.library.UploadButton
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SongDetailScreen(
     songId: Int,
@@ -64,6 +61,9 @@ fun SongDetailScreen(
     navController: NavController
 ) {
     val uiState = viewModel.songDetails.collectAsState().value
+    var showEditDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState()
 
     LaunchedEffect(songId) {
         viewModel.loadSongDetails(songId)
@@ -74,7 +74,32 @@ fun SongDetailScreen(
             Text("Loading...", color = Color.White)
         }
         is SongDetailUiState.Success -> {
-            SongDetailsContent(song = uiState.song, navController = navController, showBorder = false, viewModel = viewModel)
+            SongDetailsContent(
+                song = uiState.song,
+                navController = navController,
+                showBorder = false,
+                viewModel = viewModel,
+                onEditClick = { showEditDialog = true }
+            )
+            if (showEditDialog) {
+                ModalBottomSheet(
+                    onDismissRequest = { showEditDialog = false },
+                    sheetState = sheetState
+                ) {
+                    EditSongDialogContent(
+                        song = uiState.song,
+                        onDismiss = {
+                            scope.launch { sheetState.hide() }.invokeOnCompletion {
+                                if (!sheetState.isVisible) {
+                                    showEditDialog = false
+                                }
+                            }
+                        },
+                        viewModel = viewModel,
+                        navController= navController
+                    )
+                }
+            }
         }
         is SongDetailUiState.Error -> {
             Text(uiState.message, color = Color.Red)
@@ -91,14 +116,22 @@ fun formatTime(millis: Int): String {
 }
 
 @Composable
-fun SongDetailsContent(song: Songs, navController: NavController, showBorder: Boolean, viewModel: SongDetailViewModel) {
+fun SongDetailsContent(
+    song: Songs,
+    navController: NavController,
+    showBorder: Boolean,
+    viewModel: SongDetailViewModel,
+    onEditClick: () -> Unit
+) {
     var sliderPosition by remember { mutableFloatStateOf(0f) }
     var dominantColor by remember { mutableStateOf(SpotifyBlack) }
     var currentPosition by remember { mutableIntStateOf(0) }
     var showOptions by remember { mutableStateOf(false) }
     var optionsAnchor by remember { mutableStateOf(DpOffset.Zero) }
-
+    var isPlaying by remember { mutableStateOf(false) }
+    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     val context = LocalContext.current
+
     val artworkUri = song.artwork.let { File(it).toUri() }
 
     val painter = rememberAsyncImagePainter(
@@ -125,6 +158,18 @@ fun SongDetailsContent(song: Songs, navController: NavController, showBorder: Bo
                         dominantColor = Color(color)
                     }
                 }
+            }
+        }
+    }
+
+    LaunchedEffect(isPlaying) {
+        if (isPlaying && mediaPlayer != null) {
+            while (isPlaying) {
+                withContext(Dispatchers.Main) {
+                    currentPosition = mediaPlayer?.currentPosition ?: 0
+                    sliderPosition = currentPosition.toFloat() / song.duration.toFloat()
+                }
+                delay(1000) // Update every 1 second
             }
         }
     }
@@ -161,10 +206,9 @@ fun SongDetailsContent(song: Songs, navController: NavController, showBorder: Bo
             Spacer(modifier = Modifier.weight(1f))
             IconButton(onClick = {
                 showOptions = !showOptions
-                // Calculate anchor position relative to the IconButton
                 optionsAnchor = DpOffset(
-                    x = (-50).dp, // Adjust x-offset to move left
-                    y = (-50).dp // Adjust y-offset as needed
+                    x = (-50).dp,
+                    y = (-50).dp
                 )
             }) {
                 Icon(Icons.Filled.MoreVert, contentDescription = "Options")
@@ -182,6 +226,13 @@ fun SongDetailsContent(song: Songs, navController: NavController, showBorder: Bo
                         showOptions = false
                     },
                 )
+                DropdownMenuItem(
+                    text = { Text("Edit", color = SpotifyLightGray) },
+                    onClick = {
+                        onEditClick()
+                        showOptions = false
+                    },
+                )
             }
         }
 
@@ -191,11 +242,7 @@ fun SongDetailsContent(song: Songs, navController: NavController, showBorder: Bo
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Image(
-                painter = rememberAsyncImagePainter(
-                    ImageRequest.Builder(context).data(data = artworkUri).apply {
-                        crossfade(true)
-                    }.build()
-                ),
+                painter = painter,
                 contentDescription = "Artist Artwork",
                 modifier = Modifier
                     .size(300.dp)
@@ -250,6 +297,7 @@ fun SongDetailsContent(song: Songs, navController: NavController, showBorder: Bo
             onValueChange = {
                 sliderPosition = it
                 currentPosition = (it * song.duration.toInt()).toInt()
+                mediaPlayer?.seekTo(currentPosition)
             },
             valueRange = 0f..1f,
             modifier = Modifier.fillMaxWidth()
@@ -275,12 +323,31 @@ fun SongDetailsContent(song: Songs, navController: NavController, showBorder: Bo
                 tint = Color.White,
                 modifier = Modifier.size(48.dp)
             )
-            Icon(
-                imageVector = Icons.Filled.PlayArrow,
-                contentDescription = "Play",
-                tint = Color.White,
-                modifier = Modifier.size(64.dp)
-            )
+            IconButton(onClick = {
+                if (isPlaying) {
+                    mediaPlayer?.pause()
+                    isPlaying = false
+                } else {
+                    if (mediaPlayer == null) {
+                        mediaPlayer = MediaPlayer().apply {
+                            setDataSource(context, Uri.fromFile(File(song.filePath)))
+                            prepare()
+                            start()
+                            isPlaying = true
+                        }
+                    } else {
+                        mediaPlayer?.start()
+                        isPlaying = true
+                    }
+                }
+            }) {
+                Icon(
+                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = "Play",
+                    tint = Color.White,
+                    modifier = Modifier.size(64.dp)
+                )
+            }
             Icon(
                 imageVector = Icons.Filled.SkipNext,
                 contentDescription = "Skip Next",
@@ -289,5 +356,111 @@ fun SongDetailsContent(song: Songs, navController: NavController, showBorder: Bo
             )
         }
     }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            mediaPlayer?.release()
+            mediaPlayer = null
+        }
+    }
 }
 
+@Composable
+fun EditSongDialogContent(song: Songs, onDismiss: () -> Unit, viewModel: SongDetailViewModel,navController: NavController) {
+    var title by remember { mutableStateOf(song.name) }
+    var artist by remember { mutableStateOf(song.artist) }
+    var photoUri by remember { mutableStateOf<Uri?>(song.artwork.let { File(it).toUri() }) }
+    var fileUri by remember { mutableStateOf<Uri?>(null) }
+    val context = LocalContext.current
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        photoUri = uri
+    }
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        fileUri = uri
+        if (fileUri != null) {
+            val metadata = viewModel.getMetadata(fileUri)
+            title = metadata.first ?: ""
+            artist = metadata.second ?: ""
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Edit Song",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            UploadButton(
+                text = "Edit Photo",
+                icon = R.drawable.ic_image,
+                onClick = { photoPickerLauncher.launch("image/*") },
+                isSelected = photoUri != null
+            )
+            UploadButton(
+                text = "Edit File",
+                icon = R.drawable.ic_file,
+                onClick = { filePickerLauncher.launch("audio/*") },
+                isSelected = fileUri != null
+            )
+        }
+
+        OutlinedTextField(
+            value = title,
+            onValueChange = { title = it },
+            label = { Text("Title") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 16.dp)
+        )
+
+        OutlinedTextField(
+            value = artist,
+            onValueChange = { artist = it },
+            label = { Text("Artist") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 24.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            ) {
+                Text("Cancel")
+            }
+
+            Button(
+                onClick = {
+                    viewModel.updateSong(song.copy(name = title, artist = artist),photoUri= photoUri,fileUri= fileUri)
+                    onDismiss()
+                    navController.popBackStack()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Text("Save")
+            }
+        }
+    }
+}

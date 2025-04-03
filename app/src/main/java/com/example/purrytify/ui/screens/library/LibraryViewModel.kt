@@ -7,6 +7,7 @@ import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
+import com.example.purrytify.utils.MediaUtils
 import androidx.lifecycle.viewModelScope
 import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.db.AppDatabase
@@ -56,13 +57,14 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
         viewModelScope.launch {
             if (uri != null && isAudioFile(uri)) {
-                val audioFilePath = copyAudioToInternalStorage(uri)
+                val audioFilePath = MediaUtils.copyAudioToInternalStorage(uri,context= context)
                 if (audioFilePath != null) {
-                    val duration = getAudioDuration(Uri.fromFile(File(audioFilePath)), context)
+                    val duration = MediaUtils.getAudioDuration(Uri.fromFile(File(audioFilePath)), context)
+
                     var artworkFilePath: String? = null
 
                     if (artworkUri != null) {
-                        artworkFilePath = copyArtworkToInternalStorage(artworkUri)
+                        artworkFilePath = MediaUtils.copyArtworkToInternalStorage(artworkUri, context = context)
                     }
 
                     val newSong = Songs(artist= artist,name= title, description = "", userId = userId, duration = duration, filePath = audioFilePath, artwork = artworkFilePath ?: "") // Use userId
@@ -76,92 +78,11 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun toggleFavoriteStatus(song: Songs) {
-        viewModelScope.launch {
-            songDao.updateFavoriteStatus(song.id, !song.isFavorite)
-        }
-    }
-
-    fun deleteSong(song: Songs) {
-        viewModelScope.launch {
-            songDao.deleteById(song.id)
-        }
-    }
 
     private fun isAudioFile(uri: Uri): Boolean {
         val mimeType = context.contentResolver.getType(uri)
         return mimeType?.startsWith("audio/") == true
     }
 
-    fun getAudioDuration(uri: Uri, context: Context): Long {
-        val retriever = MediaMetadataRetriever()
-        try {
-            if (uri.scheme == "content") {
-                retriever.setDataSource(context, uri)
-            } else if (uri.scheme == "file") {
-                retriever.setDataSource(uri.path)
-            }
 
-            val durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-            Log.d("Metadata", "Duration: $durationStr  URI: $uri")
-
-            return durationStr?.toLongOrNull() ?: 0L
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return 0L
-        } finally {
-            retriever.release()
-        }
-    }
-
-    fun getMetadata(uri: Uri?): Pair<String?, String?> {
-        if (uri == null) return Pair(null, null)
-
-        val retriever = MediaMetadataRetriever()
-        var title: String? = null
-        var artist: String? = null
-
-        try {
-            if (uri.scheme == "content") {
-                retriever.setDataSource(context, uri)
-            } else if (uri.scheme == "file") {
-                retriever.setDataSource(uri.path)
-            }
-
-            title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
-            artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
-
-        } catch (e: Exception) {
-            Log.e("Player", "Error getting metadata: ${e.message}")
-        } finally {
-            retriever.release()
-        }
-
-        return Pair(title, artist)
-    }
-
-    private fun copyArtworkToInternalStorage(artworkUri: Uri): String? {
-        val inputStream = context.contentResolver.openInputStream(artworkUri) ?: return null
-        val fileName = "artwork_${System.currentTimeMillis()}.jpg"
-        val file = File(context.filesDir, fileName)
-        val outputStream = FileOutputStream(file)
-
-        inputStream.copyTo(outputStream)
-        inputStream.close()
-        outputStream.close()
-
-        return file.absolutePath
-    }
-    private fun copyAudioToInternalStorage(audioUri: Uri): String? {
-        val inputStream = context.contentResolver.openInputStream(audioUri) ?: return null
-        val fileName = "audio_${System.currentTimeMillis()}.mp3" // Ensure to use the correct extension
-        val file = File(context.filesDir, fileName)
-        val outputStream = FileOutputStream(file)
-
-        inputStream.copyTo(outputStream)
-        inputStream.close()
-        outputStream.close()
-
-        return file.absolutePath
-    }
 }
