@@ -101,7 +101,7 @@ fun LibraryScreen(libraryViewModel: LibraryViewModel = viewModel(),navController
 
             LazyColumn {
                 items(songsFlow) { song ->
-                    SongItem(song, libraryViewModel, onNavigate = {route -> navController.navigate(route)})
+                    SongItem(song,  onNavigate = {route -> navController.navigate(route)})
                 }
             }
         }
@@ -120,10 +120,7 @@ fun LibraryScreen(libraryViewModel: LibraryViewModel = viewModel(),navController
     }
 }
 @Composable
-fun SongItem(song: Songs, libraryViewModel: LibraryViewModel,onNavigate: (String) -> Unit) {
-    var showOptions by remember { mutableStateOf(false) }
-    var optionsAnchor by remember { mutableStateOf(DpOffset.Zero) }
-
+fun SongItem(song: Songs,onNavigate: (String) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -157,44 +154,8 @@ fun SongItem(song: Songs, libraryViewModel: LibraryViewModel,onNavigate: (String
             Text(text = song.artist, fontSize = 12.sp, color = Color.Gray)
         }
 
-        IconButton(onClick = {
-            showOptions = !showOptions
-            optionsAnchor = DpOffset(0.dp, 40.dp)
-        }) {
-            Icon(Icons.Default.MoreVert, contentDescription = "Options")
-        }
 
-        DropdownMenu(
-            expanded = showOptions,
-            onDismissRequest = { showOptions = false },
-            offset = optionsAnchor
-        ) {
-            DropdownMenuItem(
-                text = { Text("Like") },
-                onClick = {
-                    libraryViewModel.toggleFavoriteStatus(song)
-                    showOptions = false
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = if (song.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = "Favorite",
-                        tint = Color.Yellow
-                    )
-                }
-            )
 
-            DropdownMenuItem(
-                text = { Text("Delete", color = Color.Red) },
-                onClick = {
-                    libraryViewModel.deleteSong(song)
-                    showOptions = false
-                },
-                leadingIcon = {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
-                }
-            )
-        }
     }
 }
 

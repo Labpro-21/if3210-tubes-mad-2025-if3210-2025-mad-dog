@@ -32,4 +32,16 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
             }
         }
     }
+    fun toggleFavoriteStatus(song: Songs) {
+        viewModelScope.launch {
+            songDao.updateSong(song.copy(isFavorite = !song.isFavorite))
+            loadSongDetails(song.id)
+        }
+    }
+
+    fun deleteSong(song: Songs) {
+        viewModelScope.launch {
+            songDao.deleteSong(song)
+        }
+    }
 }

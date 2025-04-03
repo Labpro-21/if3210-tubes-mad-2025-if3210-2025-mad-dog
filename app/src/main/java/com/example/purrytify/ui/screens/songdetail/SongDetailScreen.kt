@@ -10,12 +10,17 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -28,11 +33,12 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.graphics.drawable.toBitmap
 import androidx.core.net.toUri
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
@@ -43,6 +49,9 @@ import androidx.navigation.compose.rememberNavController
 import androidx.palette.graphics.Palette
 import coil.imageLoader
 import com.example.purrytify.ui.theme.SpotifyBlack
+import com.example.purrytify.ui.theme.SpotifyDarkGray
+import com.example.purrytify.ui.theme.SpotifyLightGray
+import com.example.purrytify.ui.theme.SpotifyWhite
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -65,7 +74,7 @@ fun SongDetailScreen(
             Text("Loading...", color = Color.White)
         }
         is SongDetailUiState.Success -> {
-            SongDetailsContent(song = uiState.song, navController = navController, showBorder = true)
+            SongDetailsContent(song = uiState.song, navController = navController, showBorder = false, viewModel = viewModel)
         }
         is SongDetailUiState.Error -> {
             Text(uiState.message, color = Color.Red)
@@ -74,10 +83,20 @@ fun SongDetailScreen(
     }
 }
 
+fun formatTime(millis: Int): String {
+    val totalSeconds = millis / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return String.format("%02d:%02d", minutes, seconds)
+}
+
 @Composable
-fun SongDetailsContent(song: Songs, navController: NavController, showBorder: Boolean) {
+fun SongDetailsContent(song: Songs, navController: NavController, showBorder: Boolean, viewModel: SongDetailViewModel) {
     var sliderPosition by remember { mutableFloatStateOf(0f) }
-    var dominantColor by remember { mutableStateOf(SpotifyBlack) } // Default color
+    var dominantColor by remember { mutableStateOf(SpotifyBlack) }
+    var currentPosition by remember { mutableIntStateOf(0) }
+    var showOptions by remember { mutableStateOf(false) }
+    var optionsAnchor by remember { mutableStateOf(DpOffset.Zero) }
 
     val context = LocalContext.current
     val artworkUri = song.artwork.let { File(it).toUri() }
@@ -140,12 +159,30 @@ fun SongDetailsContent(song: Songs, navController: NavController, showBorder: Bo
                     .clickable { navController.popBackStack() }
             )
             Spacer(modifier = Modifier.weight(1f))
-            Icon(
-                imageVector = Icons.Filled.MoreVert,
-                contentDescription = "More",
-                tint = Color.White,
-                modifier = Modifier.size(24.dp)
-            )
+            IconButton(onClick = {
+                showOptions = !showOptions
+                // Calculate anchor position relative to the IconButton
+                optionsAnchor = DpOffset(
+                    x = (-50).dp, // Adjust x-offset to move left
+                    y = (-50).dp // Adjust y-offset as needed
+                )
+            }) {
+                Icon(Icons.Filled.MoreVert, contentDescription = "Options")
+            }
+            DropdownMenu(
+                expanded = showOptions,
+                onDismissRequest = { showOptions = false },
+                offset = optionsAnchor
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Delete", color = SpotifyLightGray) },
+                    onClick = {
+                        viewModel.deleteSong(song)
+                        navController.popBackStack()
+                        showOptions = false
+                    },
+                )
+            }
         }
 
         // Artwork
@@ -193,12 +230,15 @@ fun SongDetailsContent(song: Songs, navController: NavController, showBorder: Bo
                     )
                 }
 
-                Icon(
-                    imageVector = Icons.Filled.FavoriteBorder,
-                    contentDescription = "Favorite",
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
+                IconButton(onClick = {
+                    viewModel.toggleFavoriteStatus(song)
+                }) {
+                    Icon(
+                        imageVector = if (song.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                        contentDescription = "Favorite",
+                        tint = Color.White
+                    )
+                }
             }
         }
 
@@ -207,7 +247,10 @@ fun SongDetailsContent(song: Songs, navController: NavController, showBorder: Bo
         // Slider
         Slider(
             value = sliderPosition,
-            onValueChange = { sliderPosition = it },
+            onValueChange = {
+                sliderPosition = it
+                currentPosition = (it * song.duration.toInt()).toInt()
+            },
             valueRange = 0f..1f,
             modifier = Modifier.fillMaxWidth()
         )
@@ -216,8 +259,8 @@ fun SongDetailsContent(song: Songs, navController: NavController, showBorder: Bo
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(text = "1:44", color = Color.Gray)
-            Text(text = "3:50", color = Color.Gray)
+            Text(text = formatTime(currentPosition), color = Color.Gray)
+            Text(text = formatTime(song.duration.toInt()), color = Color.Gray)
         }
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -248,22 +291,3 @@ fun SongDetailsContent(song: Songs, navController: NavController, showBorder: Bo
     }
 }
 
-@Preview(showBackground = false)
-@Composable
-fun SongDetailsScreenPreview() {
-    val dummySong = Songs(
-        id = 1,
-        userId = 129,
-        name = "Starboy",
-        artist = "The Weeknd, Daft Punk",
-        duration = 230000,
-        artwork = "content://media/external/audio/albumart/1",
-        description = "This is a dummy song description.",
-        filePath = "/path/to/dummy/song.mp3"
-    )
-    val navController = rememberNavController()
-
-    Column(modifier = Modifier.background(Color.Black)) {
-        SongDetailsContent(song = dummySong, navController = navController, showBorder = true)
-    }
-}
