@@ -42,6 +42,7 @@ import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 import com.example.purrytify.R
 import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.db.entity.Songs
@@ -49,7 +50,7 @@ import com.example.purrytify.ui.theme.PurrytifyTheme
 import java.io.File
 
 @Composable
-fun LibraryScreen(libraryViewModel: LibraryViewModel = viewModel()) {
+fun LibraryScreen(libraryViewModel: LibraryViewModel = viewModel(),navController: NavController) {
     var showAllSongs by remember { mutableStateOf(true) }
     var showAddSongDialog by remember { mutableStateOf(false) }
 
@@ -100,7 +101,7 @@ fun LibraryScreen(libraryViewModel: LibraryViewModel = viewModel()) {
 
             LazyColumn {
                 items(songsFlow) { song ->
-                    SongItem(song, libraryViewModel)
+                    SongItem(song, libraryViewModel, onNavigate = {route -> navController.navigate(route)})
                 }
             }
         }
@@ -119,14 +120,17 @@ fun LibraryScreen(libraryViewModel: LibraryViewModel = viewModel()) {
     }
 }
 @Composable
-fun SongItem(song: Songs, libraryViewModel: LibraryViewModel) {
+fun SongItem(song: Songs, libraryViewModel: LibraryViewModel,onNavigate: (String) -> Unit) {
     var showOptions by remember { mutableStateOf(false) }
     var optionsAnchor by remember { mutableStateOf(DpOffset.Zero) }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(vertical = 8.dp)
+            .clickable {
+            onNavigate("songDetails/${song.id}")
+    },
 
         verticalAlignment = Alignment.CenterVertically
     ) {

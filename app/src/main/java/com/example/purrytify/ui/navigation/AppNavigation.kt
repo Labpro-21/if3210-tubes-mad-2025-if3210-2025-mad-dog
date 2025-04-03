@@ -10,11 +10,15 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import com.example.purrytify.ui.components.BottomNavigationBar
 import com.example.purrytify.ui.screens.home.HomeScreenContent
 import com.example.purrytify.ui.screens.library.LibraryScreen
 import com.example.purrytify.ui.screens.profile.ProfileScreen
 import com.example.purrytify.ui.screens.setting.SettingScreen
+import com.example.purrytify.ui.screens.songdetail.SongDetailScreen
+
 import com.example.purrytify.ui.theme.SpotifyBlack
 
 sealed class Screen(val route: String) {
@@ -22,6 +26,7 @@ sealed class Screen(val route: String) {
     object Library : Screen("library")
     object Profile : Screen("profile")
     object Settings : Screen("settings")
+    object SongDetail : Screen("songDetails/{songId}")
 }
 
 @Composable
@@ -34,7 +39,7 @@ fun AppNavigation(
 
     //
     val showBottomBar = when (currentRoute) {
-        Screen.Home.route, Screen.Library.route, Screen.Profile.route -> true
+        Screen.Home.route, Screen.Library.route, Screen.Profile.route,Screen.SongDetail.route -> true
         else -> false
     }
 
@@ -66,7 +71,9 @@ fun AppNavigation(
                 HomeScreenContent()
             }
             composable(Screen.Library.route) {
-                LibraryScreen()
+                LibraryScreen(
+                    navController = navController
+                )
             }
             composable(Screen.Profile.route) {
                 ProfileScreen(
@@ -83,6 +90,14 @@ fun AppNavigation(
                     onLogout = onLogout
                 )
             }
+            composable(
+                Screen.SongDetail.route,
+                arguments = listOf(navArgument("songId") { type = NavType.IntType })
+            ) { backStackEntry ->
+                val songId = backStackEntry.arguments?.getInt("songId") ?: -1
+                SongDetailScreen(songId = songId, navController= navController)
+            }
+
         }
     }
 }
