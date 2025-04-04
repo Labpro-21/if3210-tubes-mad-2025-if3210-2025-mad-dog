@@ -76,10 +76,19 @@ class AuthRepository private constructor(
         val token = tokenManager.getAccessToken()
         val isLoggedIn = token != null
 
-        _authState.value = if (isLoggedIn) AuthState.Authenticated else AuthState.NotAuthenticated
-
-        Log.d(TAG, "isLoggedIn check: $isLoggedIn")
-        return isLoggedIn
+        if (isLoggedIn) {
+            val verifyResult = verifyToken()
+            if (verifyResult.isSuccess) {
+                _authState.value = AuthState.Authenticated
+                return true
+            } else {
+                _authState.value = AuthState.NotAuthenticated
+                return false
+            }
+        } else {
+            _authState.value = AuthState.NotAuthenticated
+            return false
+        }
     }
 
     suspend fun verifyToken(): Result<VerifyTokenResponse> {
@@ -95,7 +104,6 @@ class AuthRepository private constructor(
                 Log.d(TAG, "Token verification successful")
                 _authState.value = AuthState.Authenticated
                 response.body()?.let { verifyTokenResponse ->
-                    // Set currentUserId setelah verifikasi token berhasil
                     currentUserId = verifyTokenResponse.user.id
                     return Result.success(verifyTokenResponse)
                 } ?: run {
