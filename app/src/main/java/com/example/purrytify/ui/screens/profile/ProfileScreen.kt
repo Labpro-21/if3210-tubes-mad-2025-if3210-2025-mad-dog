@@ -67,7 +67,7 @@ fun ProfileScreen(
             .fillMaxSize()
             .background(Brush.verticalGradient(
                 colorStops = arrayOf(
-                    0.0f to Color(0xFF004E92),
+                    0.0f to Color(0xFF00667B),
                     0.5f to Color.Black,
                     1.0f to Color.Black
                 )
