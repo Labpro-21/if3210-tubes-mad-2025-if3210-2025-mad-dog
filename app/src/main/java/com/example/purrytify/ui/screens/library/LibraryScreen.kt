@@ -38,19 +38,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.example.purrytify.R
 import com.example.purrytify.db.entity.Songs
+import com.example.purrytify.ui.theme.SpotifyBlack
 import com.example.purrytify.utils.MediaUtils
 import kotlinx.coroutines.launch
 import java.io.File
 
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+
 fun LibraryScreen(libraryViewModel: LibraryViewModel = viewModel(), navController: NavController) {
     var showAllSongs by remember { mutableStateOf(true) }
     var showAddSongDialog by remember { mutableStateOf(false) }
@@ -78,54 +85,81 @@ fun LibraryScreen(libraryViewModel: LibraryViewModel = viewModel(), navControlle
                 libraryViewModel.favoriteSongs.collectAsState(initial = emptyList()).value
             }
 
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Header (Navbar)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(SpotifyBlack)
+                        .padding(16.dp)
+                        .zIndex(1f) // Ensure the header is drawn on top
                 ) {
-                    Text(
-                        text = "Library",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Library",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+
+                        IconButton(
+                            onClick = { showAddSongDialog = true },
+                            modifier = Modifier.align(Alignment.CenterVertically)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Add Song")
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Start
+                    ) {
+                        Button(
+                            onClick = { showAllSongs = true },
+                            modifier = Modifier.padding(top = 8.dp, end = 8.dp, bottom = 8.dp), // Padding selain kiri
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (showAllSongs) MaterialTheme.colorScheme.primary else Color.DarkGray,
+                                contentColor = if (showAllSongs) Color.Black else Color.White,
+                            )
+                        ) {
+                            Text(text = "All")
+                        }
+
+                        Button(
+                            onClick = { showAllSongs = false },
+                            modifier = Modifier.padding(top = 8.dp, end = 8.dp, bottom = 8.dp), // Padding selain kiri
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (!showAllSongs) MaterialTheme.colorScheme.primary else Color.DarkGray,
+                                contentColor = if (!showAllSongs) Color.Black else Color.White,
+                            )
+                        ) {
+                            Text(text = "Liked")
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Divider(color = Color.Gray, thickness = 1.dp)
+
+                }
+
+                // RecyclerView Content
+                Column(modifier = Modifier.weight(1f).padding(8.dp)) {
+                    AndroidView(
+                        factory = { context ->
+                            val recyclerView = RecyclerView(context)
+                            recyclerView.layoutManager = LinearLayoutManager(context)
+                            recyclerView
+                        },
+                        update = { recyclerView ->
+                            recyclerView.adapter = SongAdapter(songsFlow, onNavigate = { route -> navController.navigate(route) })
+                            (recyclerView.adapter as SongAdapter).notifyDataSetChanged()
+                        },
+                        modifier = Modifier.fillMaxSize()
                     )
-
-                    IconButton(
-                        onClick = { showAddSongDialog = true },
-                        modifier = Modifier.align(Alignment.CenterVertically)
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = "Add Song")
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Button(
-                        onClick = { showAllSongs = true },
-                        modifier = Modifier.padding(8.dp)
-                    ) {
-                        Text(text = "Show All Songs")
-                    }
-
-                    Button(
-                        onClick = { showAllSongs = false },
-                        modifier = Modifier.padding(8.dp)
-                    ) {
-                        Text(text = "Show Liked Songs")
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                LazyColumn {
-                    items(songsFlow) { song ->
-                        SongItem(song, onNavigate = { route -> navController.navigate(route) })
-                    }
                 }
             }
 
@@ -149,7 +183,7 @@ fun LibraryScreen(libraryViewModel: LibraryViewModel = viewModel(), navControlle
         }
     }
 }
-
+/**
 @Composable
 fun SongItem(song: Songs, onNavigate: (String) -> Unit) {
     Row(
@@ -185,7 +219,7 @@ fun SongItem(song: Songs, onNavigate: (String) -> Unit) {
         }
     }
 }
-
+**/
 @Composable
 fun SlideUpDialog(onDismiss: () -> Unit, content: @Composable () -> Unit) {
     val density = LocalDensity.current

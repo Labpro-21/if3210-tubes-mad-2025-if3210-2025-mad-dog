@@ -35,11 +35,15 @@ import java.io.File
 fun HomeScreen(
     navController: NavController,
     homeViewModel: HomeViewModel = viewModel()
+
 ) {
+    val recentlyPlayedSongs = homeViewModel.recentlyPlayedSongs.collectAsState(initial = emptyList()).value
+    val newAddedSongs = homeViewModel.newAddedSongs.collectAsState(initial = emptyList()).value
     Scaffold { paddingValues ->
         HomeScreenContent(
             modifier = Modifier.padding(paddingValues),
-            homeViewModel = homeViewModel,
+            recentlyPlayedSongs= recentlyPlayedSongs,
+            newAddedSongs= newAddedSongs,
             onNavigate = { route -> navController.navigate(route) }
         )
     }
@@ -48,11 +52,11 @@ fun HomeScreen(
 @Composable
 fun HomeScreenContent(
     modifier: Modifier = Modifier,
-    homeViewModel: HomeViewModel,
+    recentlyPlayedSongs: List<RecentlyPlayedWithSong>,
+    newAddedSongs: List<Songs>,
     onNavigate: (String) -> Unit
 ) {
-    val recentlyPlayedSongs = homeViewModel.recentlyPlayedSongs.collectAsState(initial = emptyList()).value
-    val newAddedSongs = homeViewModel.newAddedSongs.collectAsState(initial = emptyList()).value
+
 
     Column(
         modifier = Modifier

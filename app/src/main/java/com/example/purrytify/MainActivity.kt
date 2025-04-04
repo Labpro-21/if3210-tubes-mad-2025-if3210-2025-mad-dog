@@ -23,6 +23,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.example.purrytify.ui.screens.login.LoginScreen
 import com.example.purrytify.ui.theme.PurrytifyTheme
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.ui.navigation.AppNavigation
 
 
@@ -48,6 +49,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppSelector(viewModel: MainViewModel = viewModel()) {
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+
+
 
     LaunchedEffect(isLoggedIn) {
         Log.d("AppSelector", "Login state changed: isLoggedIn = $isLoggedIn")

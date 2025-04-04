@@ -42,6 +42,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 when (state) {
                     is AuthState.Authenticated -> {
                         _isLoggedIn.value = true
+
                     }
                     is AuthState.NotAuthenticated -> {
                         _isLoggedIn.value = false
