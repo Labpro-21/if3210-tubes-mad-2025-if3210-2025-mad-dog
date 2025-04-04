@@ -2,6 +2,7 @@
 
 package com.example.purrytify.ui.screens.library
 
+import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -255,22 +256,45 @@ fun AddSongDialogContent(onDismiss: () -> Unit, libraryViewModel: LibraryViewMod
     var artist by remember { mutableStateOf("") }
     var photoUri by remember { mutableStateOf<Uri?>(null) }
     var fileUri by remember { mutableStateOf<Uri?>(null) }
-    var uploadSuccess by remember { mutableStateOf(false) } // Indikator keberhasilan
+    var uploadSuccess by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        photoUri = uri
+        uri?.let {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    it,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                photoUri = it
+            } catch (e: SecurityException) {
+                Toast.makeText(context, "Gagal mendapatkan izin foto", Toast.LENGTH_SHORT).show()
+                photoUri = null
+            }
+        }
     }
+
     val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        fileUri = uri
-        if (fileUri != null) {
-            val metadata = MediaUtils.getMetadata(fileUri,context)
-            title = metadata.first ?: ""
-            artist = metadata.second ?: ""
+        uri?.let {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    it,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                fileUri = it
+                val metadata = MediaUtils.getMetadata(it, context)
+                title = metadata.first ?: ""
+                artist = metadata.second ?: ""
+            } catch (e: SecurityException) {
+                Toast.makeText(context, "Gagal mendapatkan izin file", Toast.LENGTH_SHORT).show()
+                fileUri = null
+            }
+        } ?: run {
+            Toast.makeText(context, "Tidak ada file yang dipilih", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -294,13 +318,13 @@ fun AddSongDialogContent(onDismiss: () -> Unit, libraryViewModel: LibraryViewMod
             UploadButton(
                 text = "Upload Photo",
                 icon = R.drawable.ic_image,
-                onClick = { photoPickerLauncher.launch("image/*") },
+                onClick = { photoPickerLauncher.launch(arrayOf("image/*")) }, // Perubahan di sini,
                 isSelected = photoUri != null
             )
             UploadButton(
                 text = "Upload File",
                 icon = R.drawable.ic_file,
-                onClick = { filePickerLauncher.launch("audio/*") },
+                onClick = { filePickerLauncher.launch(arrayOf("audio/*")) }, // Perubahan di sini
                 isSelected = fileUri != null
             )
         }

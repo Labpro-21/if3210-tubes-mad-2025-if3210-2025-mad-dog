@@ -43,7 +43,7 @@ class SongAdapter(
 
         holder.songName.text = song.name
         holder.songArtist.text = song.artist
-        val artworkUri = song.artwork?.let { File(it).toUri() }
+        val artworkUri = song.artwork
 
         holder.songImageComposeView.setContent {
             Image(

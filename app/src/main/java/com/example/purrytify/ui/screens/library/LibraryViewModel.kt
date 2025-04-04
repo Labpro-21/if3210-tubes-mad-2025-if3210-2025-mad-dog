@@ -15,7 +15,6 @@ import com.example.purrytify.db.entity.Songs
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import java.io.File
-import java.io.FileOutputStream
 import java.util.Date
 
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {
@@ -48,7 +47,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             }
         }
 
-    fun addSong( uri: Uri?, artworkUri: Uri?,title: String, artist:String) {
+    fun addSong(uri: Uri?, artworkUri: Uri?, title: String, artist: String) {
         val userId = authRepository.currentUserId
 
         if (userId == null) {
@@ -58,32 +57,28 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
         viewModelScope.launch {
             if (uri != null && isAudioFile(uri)) {
-                val audioFilePath = MediaUtils.copyAudioToInternalStorage(uri,context= context)
-                if (audioFilePath != null) {
-                    val duration = MediaUtils.getAudioDuration(Uri.fromFile(File(audioFilePath)), context)
+                val duration = MediaUtils.getAudioDuration(uri, context)
+                val artworkPath = artworkUri?.toString() ?: ""
 
-                    var artworkFilePath: String? = null
-
-                    if (artworkUri != null) {
-                        artworkFilePath = MediaUtils.copyArtworkToInternalStorage(artworkUri, context = context)
-                    }
-
-                    val newSong = Songs(artist= artist,name= title, description = "", userId = userId, duration = duration, filePath = audioFilePath, uploadDate = Date(),artwork = artworkFilePath ?: "") // Use userId
-                    songDao.insertSong(newSong)
-                } else {
-                    Toast.makeText(context, "Error copying audio file.", Toast.LENGTH_SHORT).show()
-                }
+                val newSong = Songs(
+                    artist = artist,
+                    name = title,
+                    description = "",
+                    userId = userId,
+                    duration = duration,
+                    filePath = uri.toString(),
+                    uploadDate = Date(),
+                    artwork = artworkPath
+                )
+                songDao.insertSong(newSong)
             } else {
                 Toast.makeText(context, "Please select a valid audio file.", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
-
     private fun isAudioFile(uri: Uri): Boolean {
         val mimeType = context.contentResolver.getType(uri)
         return mimeType?.startsWith("audio/") == true
     }
-
-
 }

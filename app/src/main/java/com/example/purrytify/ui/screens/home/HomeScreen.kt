@@ -1,5 +1,7 @@
 package com.example.purrytify.ui.screens.home
 
+import android.net.Uri
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -39,6 +41,11 @@ fun HomeScreen(
 ) {
     val recentlyPlayedSongs = homeViewModel.recentlyPlayedSongs.collectAsState(initial = emptyList()).value
     val newAddedSongs = homeViewModel.newAddedSongs.collectAsState(initial = emptyList()).value
+    Log.d("Init home played songs: ", "$recentlyPlayedSongs")
+    Log.d("Init home new songs: ", "$newAddedSongs")
+    Log.d("USER ID INIT: ", "${homeViewModel.userId}")
+
+
     Scaffold { paddingValues ->
         HomeScreenContent(
             modifier = Modifier.padding(paddingValues),
@@ -144,7 +151,7 @@ fun SongItem(
     photoSize: Int
 ) {
     val context = LocalContext.current
-    val artworkUri = song.artwork?.let { File(it).toUri() }
+    val artworkUri = song.artwork?.let { Uri.parse(it) }
 
     if (isRecommended) {
         // Tampilan untuk Recommended (New Added)

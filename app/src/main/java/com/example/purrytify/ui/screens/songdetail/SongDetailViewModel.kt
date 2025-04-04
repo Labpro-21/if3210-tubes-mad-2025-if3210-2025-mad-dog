@@ -111,30 +111,28 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
 
     fun updateSong(song: Songs, photoUri: Uri?, fileUri: Uri?) {
         viewModelScope.launch {
-            var artworkFilePath: String? = song.artwork
-            var audioFilePath: String? = song.filePath
+            var artworkPath: String? = song.artwork
+            var audioPath: String? = song.filePath
+            var duration = song.duration
 
             if (photoUri != null) {
-                artworkFilePath = MediaUtils.copyArtworkToInternalStorage(photoUri,context)
+                artworkPath = photoUri.toString() // Simpan URI sebagai String
             }
 
             if (fileUri != null && isAudioFile(fileUri)) {
-                audioFilePath = MediaUtils.copyAudioToInternalStorage(fileUri,context)
-
+                audioPath = fileUri.toString() // Simpan URI sebagai String
+                duration = MediaUtils.getAudioDuration(fileUri, context)
             }
-            if(audioFilePath!= null){
-                val duration = MediaUtils.getAudioDuration(Uri.fromFile(File(audioFilePath)), context)
-                val updatedSong = song.copy(
-                    name = song.name,
-                    artist = song.artist,
-                    artwork = artworkFilePath,
-                    filePath = audioFilePath,
-                    duration =duration
-                )
-                songDao.updateSong(updatedSong)
 
-            }
-            loadSongDetails(song.id)
+            val updatedSong = song.copy(
+                name = song.name,
+                artist = song.artist,
+                artwork = artworkPath,
+                filePath = audioPath.toString(),
+                duration = duration
+            )
+            songDao.updateSong(updatedSong)
+            loadSongDetails(song.id) // Memperbarui detail lagu setelah pembaruan
         }
     }
 

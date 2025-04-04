@@ -132,7 +132,7 @@ fun SongDetailsContent(
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     val context = LocalContext.current
 
-    val artworkUri = song.artwork.let { File(it).toUri() }
+    val artworkUri = song.artwork?.let { Uri.parse(it) } // Gunakan Uri.parse()
 
     val painter = rememberAsyncImagePainter(
         ImageRequest.Builder(context).data(data = artworkUri).apply {
@@ -330,7 +330,7 @@ fun SongDetailsContent(
                 } else {
                     if (mediaPlayer == null) {
                         mediaPlayer = MediaPlayer().apply {
-                            setDataSource(context, Uri.fromFile(File(song.filePath)))
+                            setDataSource(context, Uri.parse(song.filePath))
                             prepare()
                             start()
                             isPlaying = true
@@ -373,7 +373,7 @@ fun SongDetailsContent(
 fun EditSongDialogContent(song: Songs, onDismiss: () -> Unit, viewModel: SongDetailViewModel,navController: NavController) {
     var title by remember { mutableStateOf(song.name) }
     var artist by remember { mutableStateOf(song.artist) }
-    var photoUri by remember { mutableStateOf<Uri?>(song.artwork.let { File(it).toUri() }) }
+    var photoUri by remember { mutableStateOf<Uri?>(song.artwork?.let { Uri.parse(it) }) }
     var fileUri by remember { mutableStateOf<Uri?>(null) }
     val context = LocalContext.current
 
