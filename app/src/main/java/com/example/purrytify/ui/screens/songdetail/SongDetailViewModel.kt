@@ -10,7 +10,10 @@ import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.db.AppDatabase
+import com.example.purrytify.db.entity.RecentlyPlayed
 import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.utils.MediaUtils
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,11 +21,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Date
 
 class SongDetailViewModel(application: Application) : AndroidViewModel(application) {
 
     private val songDao = AppDatabase.getDatabase(application).songsDao()
     private val context = application.applicationContext
+    private val recentlyPlayedDao = AppDatabase.getDatabase(application).recentlyPlayedDao()
+    private val authRepository = AuthRepository.getInstance(application)
 
     private val _songDetails = MutableStateFlow<SongDetailUiState>(SongDetailUiState.Loading)
     val songDetails: StateFlow<SongDetailUiState> = _songDetails
@@ -41,27 +47,29 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
             }
         }
     }
-    fun getAudioDuration(uri: Uri, context: Context): Long {
-        val retriever = MediaMetadataRetriever()
-        try {
-            if (uri.scheme == "content") {
-                retriever.setDataSource(context, uri)
-            } else if (uri.scheme == "file") {
-                retriever.setDataSource(uri.path)
+    fun insertRecentlyPlayed(songId: Int) {
+        viewModelScope.launch {
+            val userId = authRepository.currentUserId
+
+            if (userId != null) {
+                try {
+                    val recentlyPlayed = RecentlyPlayed(
+                        userId = userId,
+                        songId = songId,
+                        playedAt = Date()
+                    )
+                    recentlyPlayedDao.insertRecentlyPlayed(recentlyPlayed)
+                    Log.d("Recently played added: ", recentlyPlayed.toString())
+                } catch (e: Exception) {
+                    Log.e("SongDetailViewModel", "Error inserting recently played: ${e.message}")
+                    Toast.makeText(context, "Error saving recently played", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                Log.e("SongDetailViewModel", "User ID is null, cannot insert recently played")
+                Toast.makeText(context, "User not logged in", Toast.LENGTH_SHORT).show()
             }
-
-            val durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-            Log.d("Metadata", "Duration: $durationStr  URI: $uri")
-
-            return durationStr?.toLongOrNull() ?: 0L
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return 0L
-        } finally {
-            retriever.release()
         }
     }
-
     fun toggleFavoriteStatus(song: Songs) {
         viewModelScope.launch {
             songDao.updateSong(song.copy(isFavorite = !song.isFavorite))

@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Date
 
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -67,7 +68,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                         artworkFilePath = MediaUtils.copyArtworkToInternalStorage(artworkUri, context = context)
                     }
 
-                    val newSong = Songs(artist= artist,name= title, description = "", userId = userId, duration = duration, filePath = audioFilePath, artwork = artworkFilePath ?: "") // Use userId
+                    val newSong = Songs(artist= artist,name= title, description = "", userId = userId, duration = duration, filePath = audioFilePath, uploadDate = Date(),artwork = artworkFilePath ?: "") // Use userId
                     songDao.insertSong(newSong)
                 } else {
                     Toast.makeText(context, "Error copying audio file.", Toast.LENGTH_SHORT).show()

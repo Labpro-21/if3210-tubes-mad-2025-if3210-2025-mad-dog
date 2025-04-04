@@ -35,6 +35,8 @@ interface SongsDao {
     @Query("DELETE FROM songs WHERE id = :songId")
     suspend fun deleteById(songId: Int)
 
+    @Query("SELECT * FROM songs WHERE userId = :userId ORDER BY uploadDate DESC")
+    fun getSongsForUserSortedByUploadDate(userId: Int): Flow<List<Songs>>
 
     @Query("SELECT * FROM songs WHERE name LIKE '%' || :query || '%' OR artist LIKE '%' || :query || '%'")
     fun searchSongs(query: String): Flow<List<Songs>>

@@ -334,10 +334,14 @@ fun SongDetailsContent(
                             prepare()
                             start()
                             isPlaying = true
+                            viewModel.insertRecentlyPlayed(song.id)
+
                         }
                     } else {
                         mediaPlayer?.start()
                         isPlaying = true
+                        viewModel.insertRecentlyPlayed(song.id)
+
                     }
                 }
             }) {

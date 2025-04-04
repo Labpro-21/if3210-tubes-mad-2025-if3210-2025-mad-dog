@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import com.example.purrytify.ui.components.BottomNavigationBar
+import com.example.purrytify.ui.screens.home.HomeScreen
 import com.example.purrytify.ui.screens.home.HomeScreenContent
 import com.example.purrytify.ui.screens.library.LibraryScreen
 import com.example.purrytify.ui.screens.profile.ProfileScreen
@@ -68,7 +69,7 @@ fun AppNavigation(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.Home.route) {
-                HomeScreenContent()
+                HomeScreen(navController= navController)
             }
             composable(Screen.Library.route) {
                 LibraryScreen(
