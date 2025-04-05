@@ -48,6 +48,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.purrytify.MainViewModel
 import com.example.purrytify.R
 import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.ui.theme.SpotifyBlack
@@ -59,7 +60,11 @@ import java.io.File
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 
-fun LibraryScreen(libraryViewModel: LibraryViewModel = viewModel(), navController: NavController) {
+fun LibraryScreen(
+    libraryViewModel: LibraryViewModel = viewModel(),
+    navController: NavController,
+    mainViewModel: MainViewModel
+) {
     var showAllSongs by remember { mutableStateOf(true) }
     var showAddSongDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()

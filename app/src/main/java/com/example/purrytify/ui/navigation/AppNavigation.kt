@@ -12,6 +12,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import com.example.purrytify.MainViewModel
 import com.example.purrytify.ui.components.BottomNavigationBar
 import com.example.purrytify.ui.screens.home.HomeScreen
 import com.example.purrytify.ui.screens.home.HomeScreenContent
@@ -32,7 +33,8 @@ sealed class Screen(val route: String) {
 
 @Composable
 fun AppNavigation(
-    onLogout: () -> Unit = {}
+    onLogout: () -> Unit = {},
+    mainViewModel: MainViewModel
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -69,11 +71,12 @@ fun AppNavigation(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.Home.route) {
-                HomeScreen(navController= navController)
+                HomeScreen(navController= navController, mainViewModel = mainViewModel)
             }
             composable(Screen.Library.route) {
                 LibraryScreen(
-                    navController = navController
+                    navController = navController,
+                    mainViewModel = mainViewModel
                 )
             }
             composable(Screen.Profile.route) {
@@ -96,7 +99,7 @@ fun AppNavigation(
                 arguments = listOf(navArgument("songId") { type = NavType.IntType })
             ) { backStackEntry ->
                 val songId = backStackEntry.arguments?.getInt("songId") ?: -1
-                SongDetailScreen(songId = songId, navController= navController)
+                SongDetailScreen(songId = songId, navController= navController, mainViewModel = mainViewModel)
             }
 
         }

@@ -43,6 +43,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.palette.graphics.Palette
 import coil.imageLoader
+import com.example.purrytify.MainViewModel
 import com.example.purrytify.ui.theme.SpotifyBlack
 import com.example.purrytify.ui.theme.SpotifyLightGray
 import kotlinx.coroutines.Dispatchers
@@ -58,7 +59,8 @@ import com.example.purrytify.ui.screens.library.UploadButton
 fun SongDetailScreen(
     songId: Int,
     viewModel: SongDetailViewModel = viewModel(),
-    navController: NavController
+    navController: NavController,
+    mainViewModel: MainViewModel
 ) {
     val uiState = viewModel.songDetails.collectAsState().value
     var showEditDialog by remember { mutableStateOf(false) }
@@ -79,7 +81,8 @@ fun SongDetailScreen(
                 navController = navController,
                 showBorder = false,
                 viewModel = viewModel,
-                onEditClick = { showEditDialog = true }
+                onEditClick = { showEditDialog = true },
+                mainViewModel = mainViewModel
             )
             if (showEditDialog) {
                 ModalBottomSheet(
@@ -96,7 +99,7 @@ fun SongDetailScreen(
                             }
                         },
                         viewModel = viewModel,
-                        navController= navController
+                        navController = navController
                     )
                 }
             }
@@ -121,24 +124,36 @@ fun SongDetailsContent(
     navController: NavController,
     showBorder: Boolean,
     viewModel: SongDetailViewModel,
-    onEditClick: () -> Unit
+    onEditClick: () -> Unit,
+    mainViewModel: MainViewModel
 ) {
-    var sliderPosition by remember { mutableFloatStateOf(0f) }
     var dominantColor by remember { mutableStateOf(SpotifyBlack) }
-    var currentPosition by remember { mutableIntStateOf(0) }
+    val currentPosition by mainViewModel.currentPosition.collectAsState()
     var showOptions by remember { mutableStateOf(false) }
     var optionsAnchor by remember { mutableStateOf(DpOffset.Zero) }
-    var isPlaying by remember { mutableStateOf(false) }
-    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    val isPlaying by mainViewModel.isPlaying.collectAsState()
+    val currentSong by mainViewModel.currentSong.collectAsState()
     val context = LocalContext.current
-
-    val artworkUri = song.artwork?.let { Uri.parse(it) } // Gunakan Uri.parse()
+    val isSameSong = currentSong?.id == song.id
+    val sliderPosition by remember(currentPosition, song.duration) {
+        derivedStateOf {
+            if (isSameSong) {
+                currentPosition.toFloat() / song.duration.toFloat()
+            } else {
+                0f
+            }
+        }
+    }
+    val artworkUri = song.artwork?.let { Uri.parse(it) }
 
     val painter = rememberAsyncImagePainter(
         ImageRequest.Builder(context).data(data = artworkUri).apply {
             crossfade(true)
         }.build()
     )
+    LaunchedEffect(currentPosition) {
+
+    }
 
     LaunchedEffect(artworkUri) {
         launch(Dispatchers.IO) {
@@ -162,17 +177,6 @@ fun SongDetailsContent(
         }
     }
 
-    LaunchedEffect(isPlaying) {
-        if (isPlaying && mediaPlayer != null) {
-            while (isPlaying) {
-                withContext(Dispatchers.Main) {
-                    currentPosition = mediaPlayer?.currentPosition ?: 0
-                    sliderPosition = currentPosition.toFloat() / song.duration.toFloat()
-                }
-                delay(1000) // Update every 1 second
-            }
-        }
-    }
 
     Column(
         modifier = Modifier
@@ -295,19 +299,20 @@ fun SongDetailsContent(
         Slider(
             value = sliderPosition,
             onValueChange = {
-                sliderPosition = it
-                currentPosition = (it * song.duration.toInt()).toInt()
-                mediaPlayer?.seekTo(currentPosition)
+                if (isSameSong) {
+                    val newPosition = (it * song.duration.toInt()).toInt()
+                    mainViewModel.seekTo(newPosition)
+                }
             },
             valueRange = 0f..1f,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            enabled = isSameSong
         )
-
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(text = formatTime(currentPosition), color = Color.Gray)
+            Text(text = if (isSameSong) formatTime(currentPosition) else "00:00", color = Color.Gray)
             Text(text = formatTime(song.duration.toInt()), color = Color.Gray)
         }
 
@@ -324,29 +329,11 @@ fun SongDetailsContent(
                 modifier = Modifier.size(48.dp)
             )
             IconButton(onClick = {
-                if (isPlaying) {
-                    mediaPlayer?.pause()
-                    isPlaying = false
-                } else {
-                    if (mediaPlayer == null) {
-                        mediaPlayer = MediaPlayer().apply {
-                            setDataSource(context, Uri.parse(song.filePath))
-                            prepare()
-                            start()
-                            isPlaying = true
-                            viewModel.insertRecentlyPlayed(song.id)
-
-                        }
-                    } else {
-                        mediaPlayer?.start()
-                        isPlaying = true
-                        viewModel.insertRecentlyPlayed(song.id)
-
-                    }
-                }
+                mainViewModel.playSong(song)
+                viewModel.insertRecentlyPlayed(song.id)
             }) {
                 Icon(
-                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    imageVector = if (isPlaying && isSameSong) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     contentDescription = "Play",
                     tint = Color.White,
                     modifier = Modifier.size(64.dp)
@@ -360,14 +347,8 @@ fun SongDetailsContent(
             )
         }
     }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            mediaPlayer?.release()
-            mediaPlayer = null
-        }
-    }
 }
+
 
 @Composable
 fun EditSongDialogContent(song: Songs, onDismiss: () -> Unit, viewModel: SongDetailViewModel,navController: NavController) {

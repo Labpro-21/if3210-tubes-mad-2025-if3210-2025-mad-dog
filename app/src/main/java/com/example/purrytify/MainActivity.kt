@@ -58,6 +58,7 @@ fun AppSelector(viewModel: MainViewModel = viewModel()) {
 
     if (isLoggedIn) {
         AppNavigation(
+            mainViewModel = viewModel,
             onLogout = {
                 Log.d("AppSelector", "Logout callback triggered")
                 viewModel.logout()

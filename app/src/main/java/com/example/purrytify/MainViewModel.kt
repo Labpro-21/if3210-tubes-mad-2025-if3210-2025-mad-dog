@@ -1,11 +1,16 @@
 package com.example.purrytify
 
 import android.app.Application
+import android.media.MediaPlayer
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.data.auth.AuthState
+import com.example.purrytify.db.entity.Songs
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -16,6 +21,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _isLoggedIn = MutableStateFlow(false)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn
+
+    private val _currentSong = MutableStateFlow<Songs?>(null)
+    val currentSong: StateFlow<Songs?> = _currentSong
+
+    private val _isPlaying = MutableStateFlow(false)
+    val isPlaying: StateFlow<Boolean> = _isPlaying
+
+    private var updatePositionJob: kotlinx.coroutines.Job? = null
+
+    private var mediaPlayer: MediaPlayer? = null
+    val currentPosition: MutableStateFlow<Int> = MutableStateFlow(0) // Add this property
 
     init {
         checkLoginStatus()
@@ -73,5 +89,68 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         private const val TAG = "MainViewModel"
+    }
+    fun playSong(song: Songs) {
+        Log.d("IsPlayed Song","Start${_isPlaying.value}")
+        if (_currentSong.value != song) {
+            mediaPlayer?.release()
+            mediaPlayer = MediaPlayer().apply {
+                setDataSource(getApplication(), Uri.parse(song.filePath))
+                prepare()
+                start()
+                _isPlaying.value = true
+                _currentSong.value = song
+                setOnCompletionListener {
+                    _isPlaying.value = false
+                    updatePositionJob?.cancel()
+                }
+            }
+            updateCurrentPosition(song.id)
+        } else {
+            Log.d("IsPlayed Song","Lagi playing diklik${_isPlaying.value}")
+
+            if (_isPlaying.value) {
+                mediaPlayer?.pause()
+                updatePositionJob?.cancel()
+                _isPlaying.value = false
+            } else {
+                mediaPlayer?.start()
+                _isPlaying.value = true
+                updateCurrentPosition(song.id)
+
+            }
+        }
+    }
+
+    private fun updateCurrentPosition(songId: Int) {
+        updatePositionJob?.cancel()
+        updatePositionJob = viewModelScope.launch {
+            while (mediaPlayer != null && mediaPlayer?.isPlaying == true) {
+                val currentMediaPlayerPosition = mediaPlayer?.currentPosition ?: 0
+                if (currentSong.value?.id == songId && currentPosition.value != currentMediaPlayerPosition) {
+                    currentPosition.value = currentMediaPlayerPosition
+                }
+                delay(1000)
+            }
+        }
+    }
+
+
+
+
+    fun releaseMediaPlayer() {
+        mediaPlayer?.release()
+        mediaPlayer = null
+        _isPlaying.value = false
+        _currentSong.value = null
+    }
+    fun seekTo(position: Int) {
+        mediaPlayer?.seekTo(position)
+        currentPosition.value = position
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        releaseMediaPlayer()
     }
 }

@@ -29,6 +29,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
+import com.example.purrytify.MainViewModel
 import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.db.relationship.RecentlyPlayedWithSong
 import java.io.File
@@ -36,7 +37,8 @@ import java.io.File
 @Composable
 fun HomeScreen(
     navController: NavController,
-    homeViewModel: HomeViewModel = viewModel()
+    homeViewModel: HomeViewModel = viewModel(),
+    mainViewModel: MainViewModel
 
 ) {
     val recentlyPlayedSongs = homeViewModel.recentlyPlayedSongs.collectAsState(initial = emptyList()).value
