@@ -55,4 +55,10 @@ interface SongsDao {
 
     @Query("SELECT * FROM songs WHERE userId = :userId ORDER BY duration ASC")
     fun getSongsForUserSortedByDuration(userId: Int): Flow<List<Songs>>
+
+    @Query("SELECT COUNT(*) FROM songs")
+    fun getSongsAmount(): Int
+
+    @Query("SELECT COUNT(*) FROM songs WHERE isFavorite=1")
+    fun getFavoriteSongsAmount():Int
 }
