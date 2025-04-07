@@ -37,9 +37,10 @@ class ProfileRepository private constructor(
         return dao.getSongsAmount();
     };
 
-    suspend fun getSongsLiked():Int{
+    suspend fun getSongsLiked():Int {
         return dao.getFavoriteSongsAmount();
     }
+
     companion object {
         @Volatile
         private var INSTANCE: ProfileRepository? = null

@@ -14,15 +14,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.*
@@ -48,65 +45,68 @@ import androidx.compose.runtime.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberAsyncImagePainter
 
 @Composable
 fun ProfileScreen(
+    viewModel: ProfileViewModel = viewModel(),
     onNavigateToSettings: () -> Unit = {}
 ) {
-    var profileImage by remember { mutableStateOf<Uri?>(null) }
-    var name by remember { mutableStateOf("13522xxx") }
-    var country by remember { mutableStateOf("Indonesia") }
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        profileImage = uri
-    }
+    val profile = viewModel.profile
+    val songsCount = viewModel.songsCount
+    val favoriteCount = viewModel.favoriteCount
+
+    val profileImagePainter = rememberAsyncImagePainter(
+        model = profile?.profilePhoto ?: R.drawable.ic_profile_placeholder
+    )
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(
-                colorStops = arrayOf(
-                    0.0f to Color(0xFF00667B),
-                    0.5f to Color.Black,
-                    1.0f to Color.Black
+            .background(
+                Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0.0f to Color(0xFF00667B),
+                        0.5f to Color.Black,
+                        1.0f to Color.Black
+                    )
                 )
-            )
             ),
         horizontalAlignment = Alignment.CenterHorizontally
-    ){
+    ) {
         Spacer(modifier = Modifier.height(40.dp))
 
         Box(contentAlignment = Alignment.BottomEnd) {
             Image(
-                painter = if (profileImage != null) rememberAsyncImagePainter(profileImage)
-                else painterResource(id = R.drawable.ic_profile_placeholder),
+                painter = profileImagePainter,
                 contentDescription = "Profile Picture",
                 modifier = Modifier
                     .size(120.dp)
                     .clip(CircleShape)
                     .border(2.dp, Color.White, CircleShape)
             )
-            IconButton(
-                onClick = { launcher.launch("image/*") },
-                modifier = Modifier
-                    .size(30.dp)
-                    .background(Color.White, CircleShape)
-            ) {
-                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.Black)
-            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Text(name, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
-        Text(country, fontSize = 14.sp, color = Color.LightGray)
+        Text(
+            profile?.username ?: "Loading...",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White
+        )
+
+        Text(
+            profile?.location ?: "Loading...",
+            fontSize = 14.sp,
+            color = Color.LightGray
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
-            onClick = {
-            },
+            onClick = { },
             colors = ButtonDefaults.buttonColors(Color.DarkGray)
         ) {
             Text("Edit Profile", color = Color.White)
@@ -118,26 +118,21 @@ fun ProfileScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            ProfileStat("135", "SONGS")
-            ProfileStat("32", "LIKED")
-            ProfileStat("50", "LISTENED")
+            ProfileStat(songsCount.toString(), "SONGS")
+            ProfileStat(favoriteCount.toString(), "LIKED")
+            ProfileStat("0", "LISTENED")
         }
-
 
         Spacer(modifier = Modifier.height(60.dp))
 
-        Box(
-
-        ){
-            ProfileMenuItem(
-                title = "Settings",
-                icon = Icons.Default.Settings,
-                onClick = onNavigateToSettings
-            )
-        }
+        ProfileMenuItem(
+            title = "Settings",
+            icon = Icons.Default.Settings,
+            onClick = onNavigateToSettings
+        )
     }
-
 }
+
 
 @Composable
 fun ProfileMenuItem(

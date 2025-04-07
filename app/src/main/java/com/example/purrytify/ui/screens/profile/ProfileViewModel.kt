@@ -3,13 +3,11 @@ import android.app.Application
 import androidx.compose.runtime.*
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.data.auth.ProfileRepository
-import com.example.purrytify.data.auth.TokenManager
 import com.example.purrytify.data.model.ProfileResponse
 import kotlinx.coroutines.launch
 
-class ProvileViewModel(application: Application) : AndroidViewModel(application){
+class ProfileViewModel(application: Application) : AndroidViewModel(application){
     private val repository = ProfileRepository.getInstance(application)
     var profile by mutableStateOf<ProfileResponse?>(null)
     private set
