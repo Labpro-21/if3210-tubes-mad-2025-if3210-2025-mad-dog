@@ -4,8 +4,8 @@ data class ProfileResponse(
     val id: String,
     val username: String,
     val email: String,
-    val profilePhoto: String,
+    var profilePhoto: String,
     val location: String,
     val createdAt: String,
-    val updatedAt: String
+    val updatedAt: String,
 )

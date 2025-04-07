@@ -12,7 +12,7 @@ object NetworkModule {
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
     }
-    
+
     private val okHttpClient = OkHttpClient.Builder()
         .addInterceptor(loggingInterceptor)
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -27,4 +27,10 @@ object NetworkModule {
         .build()
     
     val authApi: AuthApi = retrofit.create(AuthApi::class.java)
+    val profileApi: ProfileApi = retrofit.create(ProfileApi::class.java)
+
+    fun getProfileImageUrl(path: String): String {
+        return "${BASE_URL}uploads/profile-picture/$path"
+    }
+
 }
