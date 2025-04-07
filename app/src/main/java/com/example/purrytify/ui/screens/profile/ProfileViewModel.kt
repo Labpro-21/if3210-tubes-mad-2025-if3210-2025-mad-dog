@@ -6,27 +6,37 @@ import androidx.lifecycle.viewModelScope
 import com.example.purrytify.data.auth.ProfileRepository
 import com.example.purrytify.data.model.ProfileResponse
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
-class ProfileViewModel(application: Application) : AndroidViewModel(application){
+class ProfileViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = ProfileRepository.getInstance(application)
-    var profile by mutableStateOf<ProfileResponse?>(null)
-    private set
 
-    var songsCount by androidx.compose.runtime.mutableStateOf(0)
-        private set
+    private val _profile = MutableStateFlow<ProfileResponse?>(null)
+    val profile: StateFlow<ProfileResponse?> = _profile
 
-    var favoriteCount by androidx.compose.runtime.mutableStateOf(0)
-        private set
+    private val _songsCount = MutableStateFlow(0)
+    val songsCount: StateFlow<Int> = _songsCount
 
-    init {
-        loadProfile()
+    private val _favoriteCount = MutableStateFlow(0)
+    val favoriteCount: StateFlow<Int> = _favoriteCount
+
+    fun getProfile() {
+        viewModelScope.launch {
+            val result = repository.getProfile()
+            _profile.value = result
+        }
     }
 
-    fun loadProfile() {
+    fun getSongsCount() {
         viewModelScope.launch {
-            profile = repository.getProfile()
-            songsCount = repository.getSongsCount()
-            favoriteCount = repository.getSongsLiked()
+            _songsCount.value = repository.getSongsCount()
+        }
+    }
+
+    fun getFavoriteSongsCount() {
+        viewModelScope.launch {
+            _favoriteCount.value = repository.getSongsLiked()
         }
     }
 }

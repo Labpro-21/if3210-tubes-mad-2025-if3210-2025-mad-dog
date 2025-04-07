@@ -33,12 +33,12 @@ class ProfileRepository private constructor(
         return@withContext null;
     };
 
-    suspend fun getSongsCount():Int{
-        return dao.getSongsAmount();
+    suspend fun getSongsCount():Int = withContext(Dispatchers.IO){
+        return@withContext dao.getSongsAmount();
     };
 
-    suspend fun getSongsLiked():Int {
-        return dao.getFavoriteSongsAmount();
+    suspend fun getSongsLiked():Int = withContext(Dispatchers.IO) {
+        return@withContext dao.getFavoriteSongsAmount();
     }
 
     companion object {

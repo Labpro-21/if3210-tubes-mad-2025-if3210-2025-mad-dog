@@ -53,12 +53,24 @@ fun ProfileScreen(
     viewModel: ProfileViewModel = viewModel(),
     onNavigateToSettings: () -> Unit = {}
 ) {
-    val profile = viewModel.profile
-    val songsCount = viewModel.songsCount
-    val favoriteCount = viewModel.favoriteCount
+    val profile by viewModel.profile.collectAsState()
+    val songsCount by viewModel.songsCount.collectAsState()
+    val favoriteCount by viewModel.favoriteCount.collectAsState()
 
+    LaunchedEffect(Unit) {
+        viewModel.getProfile()
+        viewModel.getSongsCount()
+        viewModel.getFavoriteSongsCount()
+    }
+    LaunchedEffect(profile) {
+        println("Profile Photo: ${profile?.profilePhoto}")
+    }
     val profileImagePainter = rememberAsyncImagePainter(
-        model = profile?.profilePhoto ?: R.drawable.ic_profile_placeholder
+        model = if (!profile?.profilePhoto.isNullOrBlank()) {
+            profile!!.profilePhoto
+        } else {
+            R.drawable.ic_profile_placeholder
+        }
     )
 
     Column(
@@ -188,9 +200,37 @@ fun ProfileStat(value: String, label: String) {
         Text(label, fontSize = 12.sp, color = Color.LightGray)
     }
 }
-@Composable @Preview
+@Composable @Preview(showBackground = true)
 fun ProfileScreenPreview() {
     PurrytifyTheme {
-        ProfileScreen()
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.DarkGray),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(modifier = Modifier.height(40.dp))
+            Image(
+                painter = painterResource(id = R.drawable.ic_profile_placeholder),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(CircleShape)
+                    .border(2.dp, Color.White, CircleShape)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("135220xx", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text("Indonesia", fontSize = 14.sp, color = Color.LightGray)
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = {}, colors = ButtonDefaults.buttonColors(Color.DarkGray)) {
+                Text("Edit Profile", color = Color.White)
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                ProfileStat("135", "SONGS")
+                ProfileStat("32", "LIKED")
+                ProfileStat("50", "LISTENED")
+            }
+        }
     }
 }
