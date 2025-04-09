@@ -24,6 +24,11 @@ class AuthRepository private constructor(
     var currentUserId: Int? = null
         private set
 
+
+    suspend fun getAccessToken(): String? {
+        return tokenManager.getAccessToken()
+    }
+
     suspend fun login(email: String, password: String): Result<Boolean> {
         return try {
             _authState.value = AuthState.Loading
@@ -141,8 +146,18 @@ class AuthRepository private constructor(
                 response.body()?.let { refreshResponse ->
                     tokenManager.saveTokens(refreshResponse.accessToken, refreshResponse.refreshToken)
                     Log.d(TAG, "Token refresh successful")
-                    _authState.value = AuthState.Authenticated
-                    return Result.success(true)
+                    
+                    // Verify the new token to ensure it's valid and update user ID
+                    val verifyResult = verifyToken()
+                    if (verifyResult.isSuccess) {
+                        Log.d(TAG, "New token verified successfully. Auth state: ${_authState.value}")
+                        return Result.success(true)
+                    } else {
+                        val errorMessage = "New token failed verification"
+                        Log.e(TAG, errorMessage)
+                        _authState.value = AuthState.Error(errorMessage)
+                        return Result.failure(Exception(errorMessage))
+                    }
                 }
 
                 val errorMessage = "Empty response body during token refresh"

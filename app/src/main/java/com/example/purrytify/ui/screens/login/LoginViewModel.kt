@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.db.AppDatabase
 import com.example.purrytify.db.entity.Users
+import com.example.purrytify.services.TokenServiceManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -63,6 +64,7 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
                     Log.d("LoginViewModel", "Login successful")
                     insertOrUpdateUser() // Insert atau update user setelah login berhasil
                     _loginState.value = LoginState.Success
+                    TokenServiceManager.startTokenValidationService(getApplication())
                 }
                 .onFailure { error ->
                     Log.e("LoginViewModel", "Login failed: ${error.message}")
