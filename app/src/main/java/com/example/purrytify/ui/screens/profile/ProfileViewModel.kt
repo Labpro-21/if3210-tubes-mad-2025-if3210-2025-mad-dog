@@ -18,8 +18,14 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private val _songsCount = MutableStateFlow(0)
     val songsCount: StateFlow<Int> = _songsCount
 
+    private val _playedCount = MutableStateFlow(0)
+    val playedCount: StateFlow<Int> = _playedCount
+
     private val _favoriteCount = MutableStateFlow(0)
     val favoriteCount: StateFlow<Int> = _favoriteCount
+
+
+
 
     fun getProfile() {
         viewModelScope.launch {
@@ -37,6 +43,11 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     fun getFavoriteSongsCount() {
         viewModelScope.launch {
             _favoriteCount.value = repository.getSongsLiked()
+        }
+    }
+    fun getTotalListenedCount() {
+        viewModelScope.launch {
+            _playedCount.value = repository.getTotalListened()
         }
     }
 }

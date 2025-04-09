@@ -14,7 +14,7 @@ import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.db.entity.Users
 import com.example.purrytify.utils.DateConverter
 
-@Database(entities = [Songs::class, Users::class,RecentlyPlayed::class], version = 8) // Increment version!
+@Database(entities = [Songs::class, Users::class,RecentlyPlayed::class], version = 9) // Increment version!
 @TypeConverters(DateConverter::class)
 abstract class AppDatabase : RoomDatabase() {
 

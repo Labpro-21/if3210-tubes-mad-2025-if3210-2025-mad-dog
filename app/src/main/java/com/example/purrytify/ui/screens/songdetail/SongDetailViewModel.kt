@@ -30,6 +30,9 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
     private val recentlyPlayedDao = AppDatabase.getDatabase(application).recentlyPlayedDao()
     private val authRepository = AuthRepository.getInstance(application)
 
+    private val _isUpdateSuccessful = MutableStateFlow(false)
+    val isUpdateSuccessful: StateFlow<Boolean> = _isUpdateSuccessful
+
     private val _songDetails = MutableStateFlow<SongDetailUiState>(SongDetailUiState.Loading)
     val songDetails: StateFlow<SongDetailUiState> = _songDetails
 
@@ -83,31 +86,7 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun getMetadata(uri: Uri?): Pair<String?, String?> {
-        if (uri == null) return Pair(null, null)
 
-        val retriever = MediaMetadataRetriever()
-        var title: String? = null
-        var artist: String? = null
-
-        try {
-            if (uri.scheme == "content") {
-                retriever.setDataSource(context, uri)
-            } else if (uri.scheme == "file") {
-                retriever.setDataSource(uri.path)
-            }
-
-            title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
-            artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
-
-        } catch (e: Exception) {
-            Log.e("Player", "Error getting metadata: ${e.message}")
-        } finally {
-            retriever.release()
-        }
-
-        return Pair(title, artist)
-    }
 
     fun updateSong(song: Songs, photoUri: Uri?, fileUri: Uri?) {
         viewModelScope.launch {
@@ -132,13 +111,17 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
                 duration = duration
             )
             songDao.updateSong(updatedSong)
-            loadSongDetails(song.id) // Memperbarui detail lagu setelah pembaruan
+            _isUpdateSuccessful.value = true
+            loadSongDetails(song.id)
         }
     }
 
     private fun isAudioFile(uri: Uri): Boolean {
         val mimeType = context.contentResolver.getType(uri)
         return mimeType?.startsWith("audio/") == true
+    }
+    fun resetUpdateSuccessful() {
+        _isUpdateSuccessful.value = false
     }
 
 

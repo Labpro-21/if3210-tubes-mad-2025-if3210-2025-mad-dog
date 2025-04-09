@@ -10,6 +10,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
@@ -41,7 +42,8 @@ fun AppNavigation(
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: Screen.Home.route
-    val showMiniPlayer = currentRoute == Screen.Home.route || currentRoute == Screen.Library.route
+    val isMiniPlayerActive by mainViewModel.isMiniPlayerActive.collectAsState()
+    val showMiniPlayer = (currentRoute == Screen.Home.route || currentRoute == Screen.Library.route) && isMiniPlayerActive
 
     //
     val showBottomBar = when (currentRoute) {

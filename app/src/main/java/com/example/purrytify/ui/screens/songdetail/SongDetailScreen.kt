@@ -2,9 +2,12 @@
 
 package com.example.purrytify.ui.screens.songdetail
 
+import android.content.Intent
 import android.graphics.drawable.BitmapDrawable
 import android.media.MediaPlayer
 import android.net.Uri
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -53,6 +56,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import com.example.purrytify.R
 import com.example.purrytify.ui.screens.library.UploadButton
+import com.example.purrytify.utils.MediaUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,9 +70,17 @@ fun SongDetailScreen(
     var showEditDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState()
+    val isUpdateSuccessful by viewModel.isUpdateSuccessful.collectAsState()
 
     LaunchedEffect(songId) {
         viewModel.loadSongDetails(songId)
+    }
+    LaunchedEffect(isUpdateSuccessful) {
+        if (isUpdateSuccessful) {
+            mainViewModel.stopPlaying()
+            Log.d("UpdatedSong: ","Berhasil uppdate")
+            viewModel.resetUpdateSuccessful() // Reset state setelah digunakan
+        }
     }
 
     when (uiState) {
@@ -99,7 +111,7 @@ fun SongDetailScreen(
                             }
                         },
                         viewModel = viewModel,
-                        navController = navController
+                        navController = navController,
                     )
                 }
             }
@@ -134,6 +146,7 @@ fun SongDetailsContent(
     val isPlaying by mainViewModel.isPlaying.collectAsState()
     val currentSong by mainViewModel.currentSong.collectAsState()
     val context = LocalContext.current
+    val isUpdateSuccessful by viewModel.isUpdateSuccessful.collectAsState()
     val isSameSong = currentSong?.id == song.id
     val sliderPosition by remember(currentPosition, song.duration) {
         derivedStateOf {
@@ -226,6 +239,7 @@ fun SongDetailsContent(
                     text = { Text("Delete", color = SpotifyLightGray) },
                     onClick = {
                         viewModel.deleteSong(song)
+                        mainViewModel.stopPlaying()
                         navController.popBackStack()
                         showOptions = false
                     },
@@ -356,21 +370,49 @@ fun EditSongDialogContent(song: Songs, onDismiss: () -> Unit, viewModel: SongDet
     var artist by remember { mutableStateOf(song.artist) }
     var photoUri by remember { mutableStateOf<Uri?>(song.artwork?.let { Uri.parse(it) }) }
     var fileUri by remember { mutableStateOf<Uri?>(null) }
+    var audioUploaded by remember { mutableStateOf(false) }
+
     val context = LocalContext.current
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        photoUri = uri
+        uri?.let {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    it,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                photoUri = it
+            } catch (e: SecurityException) {
+                Toast.makeText(context, "Gagal mendapatkan izin foto", Toast.LENGTH_SHORT).show()
+                photoUri = null
+            }
+        }
     }
+
     val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        fileUri = uri
-        if (fileUri != null) {
-            val metadata = viewModel.getMetadata(fileUri)
-            title = metadata.first ?: ""
-            artist = metadata.second ?: ""
+        uri?.let {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    it,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                fileUri = it
+                val metadata = MediaUtils.getMetadata(it, context)
+                title = metadata.first ?: ""
+                artist = metadata.second ?: ""
+                audioUploaded = true
+            } catch (e: SecurityException) {
+                Toast.makeText(context, "Gagal mendapatkan izin file", Toast.LENGTH_SHORT).show()
+                fileUri = null
+                audioUploaded = false
+            }
+        } ?: run {
+            Toast.makeText(context, "Tidak ada file yang dipilih", Toast.LENGTH_SHORT).show()
+            audioUploaded = false
         }
     }
 
@@ -392,23 +434,29 @@ fun EditSongDialogContent(song: Songs, onDismiss: () -> Unit, viewModel: SongDet
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             UploadButton(
-                text = "Edit Photo",
+                text = "Upload Photo",
                 icon = R.drawable.ic_image,
-                onClick = { photoPickerLauncher.launch("image/*") },
-                isSelected = photoUri != null
+                onClick = { photoPickerLauncher.launch(arrayOf("image/*"))},
+                photoUri = photoUri
             )
+
             UploadButton(
-                text = "Edit File",
+                text = "Upload File",
                 icon = R.drawable.ic_file,
-                onClick = { filePickerLauncher.launch("audio/*") },
-                isSelected = fileUri != null
+                onClick = {
+                    filePickerLauncher.launch(arrayOf("audio/*"))
+                    audioUploaded = true
+                },
+                isFileUploaded = audioUploaded
             )
+
         }
 
         OutlinedTextField(
             value = title,
             onValueChange = { title = it },
             label = { Text("Title") },
+            placeholder = {Text(song.name)},
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 16.dp)
@@ -418,6 +466,7 @@ fun EditSongDialogContent(song: Songs, onDismiss: () -> Unit, viewModel: SongDet
             value = artist,
             onValueChange = { artist = it },
             label = { Text("Artist") },
+            placeholder = {Text(song.artist)},
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 8.dp)

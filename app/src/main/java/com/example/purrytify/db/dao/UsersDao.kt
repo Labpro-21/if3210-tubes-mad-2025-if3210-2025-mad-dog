@@ -7,6 +7,7 @@ import androidx.room.Update
 import androidx.room.Delete
 import com.example.purrytify.db.entity.Users
 import kotlinx.coroutines.flow.Flow
+
 @Dao
 interface UsersDao {
 
@@ -22,6 +23,15 @@ interface UsersDao {
     @Query("SELECT * FROM users WHERE id = :userId")
     suspend fun getUserById(userId: Int): Users?
 
+    @Query("SELECT totalplayed FROM users WHERE id =:userId")
+    suspend fun getTotalPlayedById(userId: Int?): Int?
+
+
     @Query("SELECT * FROM users")
     fun getAllUsers(): Flow<List<Users>>
+
+    @Query("UPDATE users SET totalplayed = totalplayed + 1 WHERE id = :userId")
+    suspend fun incrementTotalPlayed(userId: Int)
+
+
 }

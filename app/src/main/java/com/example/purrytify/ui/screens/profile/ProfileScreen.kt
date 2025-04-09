@@ -56,11 +56,13 @@ fun ProfileScreen(
     val profile by viewModel.profile.collectAsState()
     val songsCount by viewModel.songsCount.collectAsState()
     val favoriteCount by viewModel.favoriteCount.collectAsState()
+    val playedCount by viewModel.playedCount.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.getProfile()
         viewModel.getSongsCount()
         viewModel.getFavoriteSongsCount()
+        viewModel.getTotalListenedCount()
     }
     LaunchedEffect(profile) {
         println("Profile Photo: ${profile?.profilePhoto}")
@@ -132,7 +134,7 @@ fun ProfileScreen(
         ) {
             ProfileStat(songsCount.toString(), "SONGS")
             ProfileStat(favoriteCount.toString(), "LIKED")
-            ProfileStat("0", "LISTENED")
+            ProfileStat(playedCount.toString(), "LISTENED")
         }
 
         Spacer(modifier = Modifier.height(60.dp))

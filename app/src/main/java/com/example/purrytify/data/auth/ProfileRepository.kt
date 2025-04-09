@@ -7,13 +7,16 @@ import com.example.purrytify.data.api.NetworkModule
 import com.example.purrytify.data.api.ProfileApi
 import com.example.purrytify.data.model.ProfileResponse
 import com.example.purrytify.db.dao.SongsDao
+import com.example.purrytify.db.dao.UsersDao
 import retrofit2.Response
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class ProfileRepository private constructor(
     private val tokenManager: TokenManager,
-    private val dao: SongsDao
+    private val songsdao: SongsDao,
+    private val usersdao: UsersDao,
+    private val authRepository: AuthRepository
 ){
     private val api = NetworkModule.profileApi;
 
@@ -34,11 +37,14 @@ class ProfileRepository private constructor(
     };
 
     suspend fun getSongsCount():Int = withContext(Dispatchers.IO){
-        return@withContext dao.getSongsAmount();
+        return@withContext songsdao.getSongsAmount();
     };
 
     suspend fun getSongsLiked():Int = withContext(Dispatchers.IO) {
-        return@withContext dao.getFavoriteSongsAmount();
+        return@withContext songsdao.getFavoriteSongsAmount();
+    }
+    suspend fun getTotalListened(): Int = withContext(Dispatchers.IO) {
+        return@withContext usersdao.getTotalPlayedById(authRepository.currentUserId) ?: 0
     }
 
     companion object {
@@ -49,8 +55,10 @@ class ProfileRepository private constructor(
             return INSTANCE ?: synchronized(this) {
                 val context = application.applicationContext
                 val tokenManager = TokenManager.getInstance(context)
-                val dao = AppDatabase.getDatabase(context).songsDao()
-                val instance = ProfileRepository(tokenManager, dao)
+                val authRepository = AuthRepository.getInstance(application)
+                val songsdao = AppDatabase.getDatabase(context).songsDao()
+                val usersdao = AppDatabase.getDatabase(context).usersDao()
+                val instance = ProfileRepository(tokenManager, songsdao= songsdao,usersdao=usersdao,authRepository= authRepository )
                 INSTANCE = instance
                 instance
             }

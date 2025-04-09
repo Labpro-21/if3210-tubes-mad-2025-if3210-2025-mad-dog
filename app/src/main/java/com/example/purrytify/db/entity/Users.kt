@@ -8,4 +8,5 @@ data class Users(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
     val name: String,
+    val totalplayed: Int = 0,
 )

@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.data.auth.AuthState
+import com.example.purrytify.db.AppDatabase
 import com.example.purrytify.db.entity.Songs
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
@@ -22,11 +23,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isLoggedIn = MutableStateFlow(false)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn
 
+    private val usersDao = AppDatabase.getDatabase(application).usersDao()
+
     private val _currentSong = MutableStateFlow<Songs?>(null)
     val currentSong: StateFlow<Songs?> = _currentSong
 
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying
+
+    private val _isMiniPlayerActive = MutableStateFlow(false)
+    val isMiniPlayerActive: StateFlow<Boolean> = _isMiniPlayerActive
+
+
 
     private var updatePositionJob: kotlinx.coroutines.Job? = null
 
@@ -36,6 +44,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     init {
         checkLoginStatus()
         observeAuthState()
+    }
+
+    fun activateMiniPlayer() {
+        _isMiniPlayerActive.value = true
+    }
+
+    fun deactivateMiniPlayer() {
+        _isMiniPlayerActive.value = false
     }
 
     private fun checkLoginStatus() {
@@ -99,13 +115,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 prepare()
                 start()
                 _isPlaying.value = true
+                viewModelScope.launch {
+                    Log.d("Increment played: ", "${usersDao.getTotalPlayedById(authRepository.currentUserId)}")
+                    authRepository.currentUserId?.let { usersDao.incrementTotalPlayed(it) }
+                }
                 _currentSong.value = song
                 setOnCompletionListener {
                     _isPlaying.value = false
                     updatePositionJob?.cancel()
+                    deactivateMiniPlayer()
+                    _currentSong.value = null
                 }
             }
             updateCurrentPosition(song.id)
+            activateMiniPlayer()
         } else {
             Log.d("IsPlayed Song","Lagi playing diklik${_isPlaying.value}")
 
@@ -120,6 +143,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             }
         }
+    }
+    fun stopPlaying() {
+        mediaPlayer?.pause()
+        _isPlaying.value = false
+        updatePositionJob?.cancel()
+        deactivateMiniPlayer()
+        _currentSong.value = null
     }
 
     private fun updateCurrentPosition(songId: Int) {
@@ -143,6 +173,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         mediaPlayer = null
         _isPlaying.value = false
         _currentSong.value = null
+        deactivateMiniPlayer()
     }
     fun seekTo(position: Int) {
         mediaPlayer?.seekTo(position)

@@ -262,6 +262,7 @@ fun AddSongDialogContent(onDismiss: () -> Unit, libraryViewModel: LibraryViewMod
     var photoUri by remember { mutableStateOf<Uri?>(null) }
     var fileUri by remember { mutableStateOf<Uri?>(null) }
     var uploadSuccess by remember { mutableStateOf(false) }
+    var audioUploaded by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -294,12 +295,15 @@ fun AddSongDialogContent(onDismiss: () -> Unit, libraryViewModel: LibraryViewMod
                 val metadata = MediaUtils.getMetadata(it, context)
                 title = metadata.first ?: ""
                 artist = metadata.second ?: ""
+                audioUploaded = true
             } catch (e: SecurityException) {
                 Toast.makeText(context, "Gagal mendapatkan izin file", Toast.LENGTH_SHORT).show()
                 fileUri = null
+                audioUploaded = false
             }
         } ?: run {
             Toast.makeText(context, "Tidak ada file yang dipilih", Toast.LENGTH_SHORT).show()
+            audioUploaded = false
         }
     }
 
@@ -323,14 +327,18 @@ fun AddSongDialogContent(onDismiss: () -> Unit, libraryViewModel: LibraryViewMod
             UploadButton(
                 text = "Upload Photo",
                 icon = R.drawable.ic_image,
-                onClick = { photoPickerLauncher.launch(arrayOf("image/*")) }, // Perubahan di sini,
-                isSelected = photoUri != null
+                onClick = { photoPickerLauncher.launch(arrayOf("image/*")) },
+                photoUri = photoUri
             )
+
             UploadButton(
                 text = "Upload File",
                 icon = R.drawable.ic_file,
-                onClick = { filePickerLauncher.launch(arrayOf("audio/*")) }, // Perubahan di sini
-                isSelected = fileUri != null
+                onClick = {
+                    filePickerLauncher.launch(arrayOf("audio/*"))
+                    audioUploaded = true
+                },
+                isFileUploaded = audioUploaded
             )
         }
 
@@ -393,38 +401,49 @@ fun AddSongDialogContent(onDismiss: () -> Unit, libraryViewModel: LibraryViewMod
 }
 
 @Composable
-fun UploadButton(text: String, icon: Int, onClick: () -> Unit, isSelected: Boolean) {
+fun UploadButton(text: String, icon: Int, onClick: () -> Unit, photoUri: Uri? = null, isFileUploaded: Boolean = false) {
     Box(
         modifier = Modifier
             .width(120.dp)
             .height(100.dp)
             .drawDashedBorder(color = Color.Gray, dashWidth = 10f, gapWidth = 10f)
-            .clickable(onClick = onClick)
-            .padding(8.dp),
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = text,
-                style = TextStyle(fontSize = 14.sp, color = Color.Gray),
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
+        if (photoUri == null && !isFileUploaded) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = text,
+                    style = TextStyle(fontSize = 14.sp, color = Color.Gray),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                Image(
+                    painter = painterResource(id = icon),
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp),
+                    contentScale = ContentScale.Fit
+                )
+            }
+        } else if (photoUri != null) {
             Image(
-                painter = painterResource(id = icon),
-                contentDescription = null,
-                modifier = Modifier.size(40.dp),
-                contentScale = ContentScale.Fit
+                painter = rememberAsyncImagePainter(
+                    ImageRequest.Builder(LocalContext.current).data(data = photoUri).apply {
+                        crossfade(true)
+                    }.build()
+                ),
+                contentDescription = "Selected Photo",
+                modifier = Modifier.fillMaxSize(), // Mengisi penuh Box
+                contentScale = ContentScale.Crop // Crop agar mengisi penuh
             )
-        }
-        if (isSelected) {
+        } else if (isFileUploaded) {
             Icon(
                 imageVector = Icons.Default.CheckCircle,
-                contentDescription = "Selected",
+                contentDescription = "Upload Successful",
                 tint = Color.Green,
-                modifier = Modifier.align(Alignment.BottomEnd)
+                modifier = Modifier.size(40.dp)
             )
         }
     }
