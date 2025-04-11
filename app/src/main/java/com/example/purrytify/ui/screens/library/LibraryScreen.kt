@@ -1,5 +1,3 @@
-// LibraryScreen.kt
-
 package com.example.purrytify.ui.screens.library
 
 import android.content.Intent
@@ -11,6 +9,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,6 +17,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
@@ -31,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -55,11 +58,16 @@ import com.example.purrytify.ui.theme.SpotifyBlack
 import com.example.purrytify.utils.MediaUtils
 import kotlinx.coroutines.launch
 import java.io.File
-
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.ui.graphics.Color.Companion.Black
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-
 fun LibraryScreen(
     libraryViewModel: LibraryViewModel = viewModel(),
     navController: NavController,
@@ -70,6 +78,8 @@ fun LibraryScreen(
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState()
     val userId = libraryViewModel.userId
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (userId == null) {
@@ -97,8 +107,9 @@ fun LibraryScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(SpotifyBlack)
-                        .padding(16.dp)
-                        .zIndex(1f) // Ensure the header is drawn on top
+                        .padding(vertical = if (isLandscape) 0.dp else 16.dp)
+                        .padding(horizontal = if (isLandscape) 8.dp else 16.dp)
+                        .zIndex(1f),
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -149,7 +160,6 @@ fun LibraryScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
                     Divider(color = Color.Gray, thickness = 1.dp)
-
                 }
 
                 // RecyclerView Content
@@ -170,93 +180,53 @@ fun LibraryScreen(
             }
 
             if (showAddSongDialog) {
-                ModalBottomSheet(
-                    onDismissRequest = { showAddSongDialog = false },
-                    sheetState = sheetState
-                ) {
-                    AddSongDialogContent(
-                        onDismiss = {
-                            scope.launch { sheetState.hide() }.invokeOnCompletion {
-                                if (!sheetState.isVisible) {
-                                    showAddSongDialog = false
+                if (isLandscape) {
+                    Dialog(
+                        onDismissRequest = { showAddSongDialog = false },
+                        properties = DialogProperties(usePlatformDefaultWidth = false)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(0.6f) // Atur lebar dialog (contoh 60% layar)
+                                .background(MaterialTheme.colorScheme.surface) // Set background color
+                        ) {
+                            AddSongDialogContent(
+                                onDismiss = { showAddSongDialog = false },
+                                libraryViewModel = libraryViewModel,
+                                isLandscape = true
+                            )
+                        }
+                    }
+                } else {
+                    ModalBottomSheet(
+                        onDismissRequest = { showAddSongDialog = false },
+                        sheetState = sheetState
+                    ) {
+                        AddSongDialogContent(
+                            onDismiss = {
+                                scope.launch { sheetState.hide() }.invokeOnCompletion {
+                                    if (!sheetState.isVisible) {
+                                        showAddSongDialog = false
+                                    }
                                 }
-                            }
-                        },
-                        libraryViewModel = libraryViewModel
-                    )
+                            },
+                            libraryViewModel = libraryViewModel,
+                            isLandscape = false
+                        )
+                    }
                 }
             }
         }
     }
 }
-/**
-@Composable
-fun SongItem(song: Songs, onNavigate: (String) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
-            .clickable {
-                onNavigate("songDetails/${song.id}")
-            },
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        val context = LocalContext.current
-        val artworkUri = song.artwork.let { File(it).toUri() }
 
-        Image(
-            painter = rememberAsyncImagePainter(
-                ImageRequest.Builder(context).data(data = artworkUri).apply {
-                    crossfade(true)
-                }.build()
-            ),
-            contentDescription = "Artist Artwork",
-            modifier = Modifier
-                .size(60.dp)
-                .clip(RoundedCornerShape(8.dp)),
-            contentScale = ContentScale.Crop
-        )
-
-        Spacer(modifier = Modifier.width(16.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = song.name, fontWeight = FontWeight.Bold, color = Color.White)
-            Text(text = song.artist, fontSize = 12.sp, color = Color.Gray)
-        }
-    }
-}
-**/
-@Composable
-fun SlideUpDialog(onDismiss: () -> Unit, content: @Composable () -> Unit) {
-    val density = LocalDensity.current
-    val offsetY = remember { Animatable(with(density) { 300.dp.toPx() }) }
-
-    LaunchedEffect(Unit) {
-        offsetY.animateTo(0f, animationSpec = tween(durationMillis = 300))
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.5f))
-            .clickable(onClick = onDismiss)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .offset { IntOffset(0, offsetY.value.toInt()) }
-                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(16.dp)
-                .align(Alignment.BottomCenter)
-        ) {
-            content()
-        }
-    }
-}
 
 @Composable
-fun AddSongDialogContent(onDismiss: () -> Unit, libraryViewModel: LibraryViewModel) {
+fun AddSongDialogContent(
+    onDismiss: () -> Unit,
+    libraryViewModel: LibraryViewModel,
+    isLandscape: Boolean
+) {
     var title by remember { mutableStateOf("") }
     var artist by remember { mutableStateOf("") }
     var photoUri by remember { mutableStateOf<Uri?>(null) }
@@ -310,15 +280,45 @@ fun AddSongDialogContent(onDismiss: () -> Unit, libraryViewModel: LibraryViewMod
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
+            .padding(8.dp)
+            .imePadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "Upload Song",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
+        if (isLandscape) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Filled.Close, contentDescription = "Cancel")
+                }
+                Text(
+                    text = "Upload Song",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                IconButton(onClick = {
+                    if (fileUri == null) {
+                        Toast.makeText(context, "Please select a file.", Toast.LENGTH_SHORT).show()
+                        return@IconButton
+                    }
+                    libraryViewModel.addSong(fileUri, photoUri, title, artist)
+                    uploadSuccess = true
+                    onDismiss()
+                }) {
+                    Icon(Icons.Filled.UploadFile, contentDescription = "Upload")
+                }
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+        } else {
+            Text(
+                text = "Upload Song",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -360,36 +360,45 @@ fun AddSongDialogContent(onDismiss: () -> Unit, libraryViewModel: LibraryViewMod
                 .padding(top = 8.dp)
         )
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 24.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            Button(
-                onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+        if (!isLandscape) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 24.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                Text("Cancel")
-            }
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                ) {
+                    Text("Cancel")
+                }
 
-            Button(
-                onClick = {
-                    if (fileUri == null) {
-                        Toast.makeText(context, "Please select a file.", Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
-                    libraryViewModel.addSong(fileUri, photoUri, title, artist)
-                    uploadSuccess = true
-                    onDismiss()
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-            ) {
-                Text("Save")
+                Button(
+                    onClick = {
+                        if (fileUri == null) {
+                            Toast.makeText(context, "Please select a file.", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        libraryViewModel.addSong(fileUri, photoUri, title, artist)
+                        uploadSuccess = true
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("Save")
+                }
             }
         }
 
-        if (uploadSuccess) {
+        if (uploadSuccess && !isLandscape) {
+            Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = "Upload Successful",
+                tint = Color.Green,
+                modifier = Modifier.padding(top = 16.dp)
+            )
+        } else if (uploadSuccess && isLandscape) {
             Icon(
                 imageVector = Icons.Default.CheckCircle,
                 contentDescription = "Upload Successful",

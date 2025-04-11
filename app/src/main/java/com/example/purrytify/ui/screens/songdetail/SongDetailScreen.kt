@@ -6,17 +6,25 @@ import android.content.Intent
 import android.graphics.drawable.BitmapDrawable
 import android.media.MediaPlayer
 import android.net.Uri
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MoreVert
@@ -28,16 +36,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
@@ -67,10 +79,13 @@ fun SongDetailScreen(
     mainViewModel: MainViewModel
 ) {
     val uiState = viewModel.songDetails.collectAsState().value
+    var showOptionsDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState()
     val isUpdateSuccessful by viewModel.isUpdateSuccessful.collectAsState()
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     LaunchedEffect(songId) {
         viewModel.loadSongDetails(songId)
@@ -78,7 +93,7 @@ fun SongDetailScreen(
     LaunchedEffect(isUpdateSuccessful) {
         if (isUpdateSuccessful) {
             mainViewModel.stopPlaying()
-            Log.d("UpdatedSong: ","Berhasil uppdate")
+            Log.d("UpdatedSong: ", "Berhasil uppdate")
             viewModel.resetUpdateSuccessful() // Reset state setelah digunakan
         }
     }
@@ -94,26 +109,38 @@ fun SongDetailScreen(
                 showBorder = false,
                 viewModel = viewModel,
                 onEditClick = { showEditDialog = true },
-                mainViewModel = mainViewModel
+                mainViewModel = mainViewModel,
+                isLandscape = isLandscape, // Pass the orientation state
+                onOptionClick = { showOptionsDialog = true }
             )
             if (showEditDialog) {
-                ModalBottomSheet(
+                Dialog(
                     onDismissRequest = { showEditDialog = false },
-                    sheetState = sheetState
+                    properties = DialogProperties(dismissOnClickOutside = false)
                 ) {
                     EditSongDialogContent(
                         song = uiState.song,
-                        onDismiss = {
-                            scope.launch { sheetState.hide() }.invokeOnCompletion {
-                                if (!sheetState.isVisible) {
-                                    showEditDialog = false
-                                }
-                            }
-                        },
+                        onDismiss = { showEditDialog = false },
                         viewModel = viewModel,
                         navController = navController,
                     )
                 }
+            }
+            if (showOptionsDialog) {
+                OptionsDialog(
+                    onDismissRequest = { showOptionsDialog = false },
+                    onEdit = {
+                        showEditDialog = true
+                        showOptionsDialog = false
+                    },
+                    onDelete = {
+                        viewModel.deleteSong(uiState.song)
+                        mainViewModel.stopPlaying()
+                        navController.popBackStack()
+                        showOptionsDialog = false
+                    },
+                    isLandscape = isLandscape // Pass the orientation state here
+                )
             }
         }
         is SongDetailUiState.Error -> {
@@ -121,6 +148,61 @@ fun SongDetailScreen(
         }
         else -> {}
     }
+}
+
+@Composable
+fun OptionsDialog(
+    onDismissRequest: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    isLandscape: Boolean // Receive orientation state
+) {
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier
+            .run {
+                if (isLandscape) {
+                    width(IntrinsicSize.Min) // Don't fill width in landscape
+                } else {
+                    fillMaxWidth()
+                }
+            }
+            .padding(horizontal = 48.dp)
+            .clip(RoundedCornerShape(8.dp)),
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        title = { Text("Options", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                OutlinedButton( // Use OutlinedButton for border
+                    onClick = onEdit,
+                    modifier = Modifier.fillMaxWidth(),
+                    border = BorderStroke(1.dp, Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.White)
+                ) {
+                    Icon(Icons.Filled.Edit, contentDescription = "Edit", modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Edit")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton( // Use OutlinedButton for border
+                    onClick = onDelete,
+                    modifier = Modifier.fillMaxWidth(),
+                    border = BorderStroke(1.dp, Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.White)
+                ) {
+                    Icon(Icons.Filled.Delete, contentDescription = "Delete", modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Delete")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismissRequest) {
+                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    )
 }
 
 fun formatTime(millis: Int): String {
@@ -137,16 +219,15 @@ fun SongDetailsContent(
     showBorder: Boolean,
     viewModel: SongDetailViewModel,
     onEditClick: () -> Unit,
-    mainViewModel: MainViewModel
+    mainViewModel: MainViewModel,
+    isLandscape: Boolean, // Receive the orientation state
+    onOptionClick: () -> Unit
 ) {
     var dominantColor by remember { mutableStateOf(SpotifyBlack) }
     val currentPosition by mainViewModel.currentPosition.collectAsState()
-    var showOptions by remember { mutableStateOf(false) }
-    var optionsAnchor by remember { mutableStateOf(DpOffset.Zero) }
     val isPlaying by mainViewModel.isPlaying.collectAsState()
     val currentSong by mainViewModel.currentSong.collectAsState()
     val context = LocalContext.current
-    val isUpdateSuccessful by viewModel.isUpdateSuccessful.collectAsState()
     val isSameSong = currentSong?.id == song.id
     val sliderPosition by remember(currentPosition, song.duration) {
         derivedStateOf {
@@ -190,7 +271,6 @@ fun SongDetailsContent(
         }
     }
 
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -203,13 +283,13 @@ fun SongDetailsContent(
                     )
                 )
             )
-            .padding(16.dp)
+            .padding(if (isLandscape) 8.dp else 16.dp)
     ) {
         // Top Bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 32.dp),
+                .padding(bottom = if (isLandscape) 16.dp else 32.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -221,54 +301,28 @@ fun SongDetailsContent(
                     .clickable { navController.popBackStack() }
             )
             Spacer(modifier = Modifier.weight(1f))
-            IconButton(onClick = {
-                showOptions = !showOptions
-                optionsAnchor = DpOffset(
-                    x = (-50).dp,
-                    y = (-50).dp
-                )
-            }) {
-                Icon(Icons.Filled.MoreVert, contentDescription = "Options")
-            }
-            DropdownMenu(
-                expanded = showOptions,
-                onDismissRequest = { showOptions = false },
-                offset = optionsAnchor
-            ) {
-                DropdownMenuItem(
-                    text = { Text("Delete", color = SpotifyLightGray) },
-                    onClick = {
-                        viewModel.deleteSong(song)
-                        mainViewModel.stopPlaying()
-                        navController.popBackStack()
-                        showOptions = false
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text("Edit", color = SpotifyLightGray) },
-                    onClick = {
-                        onEditClick()
-                        showOptions = false
-                    },
-                )
+            IconButton(onClick = onOptionClick) {
+                Icon(Icons.Filled.MoreVert, contentDescription = "Options", tint = Color.White)
             }
         }
 
-        // Artwork
+        // Scrollable Content Area
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()), // Make this Column scrollable
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Image(
                 painter = painter,
                 contentDescription = "Artist Artwork",
                 modifier = Modifier
-                    .size(300.dp)
+                    .size(if (isLandscape) 200.dp else 300.dp)
                     .then(if (showBorder) Modifier.border(2.dp, Color.White, RectangleShape) else Modifier),
                 contentScale = ContentScale.Crop
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(if (isLandscape) 8.dp else 16.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -281,17 +335,19 @@ fun SongDetailsContent(
                 ) {
                     Text(
                         text = song.name,
-                        fontSize = 24.sp,
+                        fontSize = if (isLandscape) 20.sp else 24.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = Color.White,
+                        maxLines = 2
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
                         text = song.artist,
-                        fontSize = 18.sp,
-                        color = Color.Gray
+                        fontSize = if (isLandscape) 16.sp else 18.sp,
+                        color = Color.Gray,
+                        maxLines = 1
                     )
                 }
 
@@ -301,76 +357,84 @@ fun SongDetailsContent(
                     Icon(
                         imageVector = if (song.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                         contentDescription = "Favorite",
-                        tint = Color.White
+                        tint = Color.White,
+                        modifier = Modifier.size(if (isLandscape) 36.dp else 48.dp)
                     )
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(if (isLandscape) 16.dp else 32.dp))
 
-        // Slider
-        Slider(
-            value = sliderPosition,
-            onValueChange = {
-                if (isSameSong) {
-                    val newPosition = (it * song.duration.toInt()).toInt()
-                    mainViewModel.seekTo(newPosition)
-                }
-            },
-            valueRange = 0f..1f,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = isSameSong
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(text = if (isSameSong) formatTime(currentPosition) else "00:00", color = Color.Gray)
-            Text(text = formatTime(song.duration.toInt()), color = Color.Gray)
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceAround
-        ) {
-            Icon(
-                imageVector = Icons.Filled.SkipPrevious,
-                contentDescription = "Skip Previous",
-                tint = Color.White,
-                modifier = Modifier.size(48.dp)
+            // Slider
+            Slider(
+                value = sliderPosition,
+                onValueChange = {
+                    if (isSameSong) {
+                        val newPosition = (it * song.duration.toInt()).toInt()
+                        mainViewModel.seekTo(newPosition)
+                    }
+                },
+                valueRange = 0f..1f,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = isSameSong
             )
-            IconButton(onClick = {
-                mainViewModel.playSong(song)
-                viewModel.insertRecentlyPlayed(song.id)
-            }) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(text = if (isSameSong) formatTime(currentPosition) else "00:00", color = Color.Gray, fontSize = if (isLandscape) 12.sp else 14.sp)
+                Text(text = formatTime(song.duration.toInt()), color = Color.Gray, fontSize = if (isLandscape) 12.sp else 14.sp)
+            }
+
+            Spacer(modifier = Modifier.height(if (isLandscape) 16.dp else 32.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
                 Icon(
-                    imageVector = if (isPlaying && isSameSong) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = "Play",
+                    imageVector = Icons.Filled.SkipPrevious,
+                    contentDescription = "Skip Previous",
                     tint = Color.White,
-                    modifier = Modifier.size(64.dp)
+                    modifier = Modifier.size(if (isLandscape) 36.dp else 48.dp)
+                )
+                IconButton(onClick = {
+                    mainViewModel.playSong(song)
+                    viewModel.insertRecentlyPlayed(song.id)
+                }) {
+                    Icon(
+                        imageVector = if (isPlaying && isSameSong) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = "Play",
+                        tint = Color.White,
+                        modifier = Modifier.size(if (isLandscape) 48.dp else 64.dp)
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Filled.SkipNext,
+                    contentDescription = "Skip Next",
+                    tint = Color.White,
+                    modifier = Modifier.size(if (isLandscape) 36.dp else 48.dp)
                 )
             }
-            Icon(
-                imageVector = Icons.Filled.SkipNext,
-                contentDescription = "Skip Next",
-                tint = Color.White,
-                modifier = Modifier.size(48.dp)
-            )
         }
     }
 }
 
 
+
 @Composable
-fun EditSongDialogContent(song: Songs, onDismiss: () -> Unit, viewModel: SongDetailViewModel,navController: NavController) {
+fun EditSongDialogContent(
+    song: Songs,
+    onDismiss: () -> Unit,
+    viewModel: SongDetailViewModel,
+    navController: NavController
+) {
     var title by remember { mutableStateOf(song.name) }
     var artist by remember { mutableStateOf(song.artist) }
     var photoUri by remember { mutableStateOf<Uri?>(song.artwork?.let { Uri.parse(it) }) }
     var fileUri by remember { mutableStateOf<Uri?>(null) }
     var audioUploaded by remember { mutableStateOf(false) }
+    val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     val context = LocalContext.current
 
@@ -422,12 +486,36 @@ fun EditSongDialogContent(song: Songs, onDismiss: () -> Unit, viewModel: SongDet
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "Edit Song",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
+        if (isLandscape) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Filled.Close, contentDescription = "Cancel")
+                }
+                Text(
+                    text = "Edit Song",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                IconButton(onClick = {
+                    viewModel.updateSong(song.copy(name = title, artist = artist), photoUri = photoUri, fileUri = fileUri)
+                    onDismiss()
+                }) {
+                    Icon(Icons.Filled.Check, contentDescription = "Save")
+                }
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+        } else {
+            Text(
+                text = "Edit Song",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -436,7 +524,7 @@ fun EditSongDialogContent(song: Songs, onDismiss: () -> Unit, viewModel: SongDet
             UploadButton(
                 text = "Upload Photo",
                 icon = R.drawable.ic_image,
-                onClick = { photoPickerLauncher.launch(arrayOf("image/*"))},
+                onClick = { photoPickerLauncher.launch(arrayOf("image/*")) },
                 photoUri = photoUri
             )
 
@@ -449,14 +537,13 @@ fun EditSongDialogContent(song: Songs, onDismiss: () -> Unit, viewModel: SongDet
                 },
                 isFileUploaded = audioUploaded
             )
-
         }
 
         OutlinedTextField(
             value = title,
             onValueChange = { title = it },
             label = { Text("Title") },
-            placeholder = {Text(song.name)},
+            placeholder = { Text(song.name) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 16.dp)
@@ -466,34 +553,35 @@ fun EditSongDialogContent(song: Songs, onDismiss: () -> Unit, viewModel: SongDet
             value = artist,
             onValueChange = { artist = it },
             label = { Text("Artist") },
-            placeholder = {Text(song.artist)},
+            placeholder = { Text(song.artist) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 8.dp)
         )
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 24.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            Button(
-                onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+        if (!isLandscape) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 24.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                Text("Cancel")
-            }
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                ) {
+                    Text("Cancel")
+                }
 
-            Button(
-                onClick = {
-                    viewModel.updateSong(song.copy(name = title, artist = artist),photoUri= photoUri,fileUri= fileUri)
-                    onDismiss()
-                    navController.popBackStack()
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-            ) {
-                Text("Save")
+                Button(
+                    onClick = {
+                        viewModel.updateSong(song.copy(name = title, artist = artist), photoUri = photoUri, fileUri = fileUri)
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("Save")
+                }
             }
         }
     }

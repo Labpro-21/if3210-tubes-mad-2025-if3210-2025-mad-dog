@@ -19,12 +19,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
@@ -32,7 +31,6 @@ import coil.request.ImageRequest
 import com.example.purrytify.MainViewModel
 import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.db.relationship.RecentlyPlayedWithSong
-import java.io.File
 
 @Composable
 fun HomeScreen(
@@ -51,8 +49,8 @@ fun HomeScreen(
     Scaffold { paddingValues ->
         HomeScreenContent(
             modifier = Modifier.padding(paddingValues),
-            recentlyPlayedSongs= recentlyPlayedSongs,
-            newAddedSongs= newAddedSongs,
+            recentlyPlayedSongs = recentlyPlayedSongs,
+            newAddedSongs = newAddedSongs,
             onNavigate = { route -> navController.navigate(route) }
         )
     }
@@ -65,47 +63,76 @@ fun HomeScreenContent(
     newAddedSongs: List<Songs>,
     onNavigate: (String) -> Unit
 ) {
-
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = if (isLandscape) 8.dp else 16.dp), // Adjust horizontal padding in landscape
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
-        TopBar()
+        Spacer(modifier = Modifier.height(if (isLandscape) 0.dp else 8.dp)) // Reduce/remove top spacer in portrait
+        TopBar(isLandscape = isLandscape) // Pass isLandscape to TopBar
 
-        Spacer(modifier = Modifier.height(24.dp))
-        Text(
-            text = "New Songs For You",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
-        )
+        Spacer(modifier = Modifier.height(if (isLandscape) 12.dp else 24.dp))
 
-        Spacer(modifier = Modifier.height(16.dp))
-        RecommendedPlaylistsSection(newAddedSongs, onNavigate)
-
-        if (recentlyPlayedSongs.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(24.dp))
+        if (isLandscape) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "New Songs For You",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    NewSongsSectionLandscape(newAddedSongs, onNavigate)
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Recently Played",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    RecentlyPlayedSectionLandscape(recentlyPlayedSongs, onNavigate)
+                }
+            }
+        } else {
             Text(
-                text = "Recently Played",
-                fontSize = 20.sp,
+                text = "New Songs For You",
+                fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            RecentlyPlayedSection(recentlyPlayedSongs, onNavigate)
+            Spacer(modifier = Modifier.height(16.dp))
+            RecommendedPlaylistsSection(newAddedSongs, onNavigate, isLandscape = false)
+
+            if (recentlyPlayedSongs.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "Recently Played",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                RecentlyPlayedSectionPortrait(recentlyPlayedSongs, onNavigate)
+            }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(if (isLandscape) 8.dp else 16.dp)) // Reduce bottom spacer
     }
 }
-
 @Composable
-fun TopBar() {
+fun TopBar(isLandscape: Boolean = false) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(start = if (isLandscape) 8.dp else 0.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -115,107 +142,157 @@ fun TopBar() {
             fontWeight = FontWeight.Bold,
             color = Color.White
         )
+    }
+}
 
-        Icon(
-            imageVector = Icons.Default.Person,
-            contentDescription = "Profile",
-            tint = Color.White,
-            modifier = Modifier.size(28.dp)
+@Composable
+fun NewSongsSectionLandscape(newAddedSongs: List<Songs>, onNavigate: (String) -> Unit) {
+    LazyColumn {
+        items(newAddedSongs) { song ->
+            SongItemLandscape(song, onNavigate, isRecommended = true)
+        }
+    }
+}
+
+@Composable
+fun RecentlyPlayedSectionLandscape(recentlyPlayedSongs: List<RecentlyPlayedWithSong>, onNavigate: (String) -> Unit) {
+    LazyColumn {
+        items(recentlyPlayedSongs) { recentlyPlayedWithSong ->
+            SongItemLandscape(recentlyPlayedWithSong.song, onNavigate)
+        }
+    }
+}
+
+@Composable
+fun RecentlyPlayedSectionPortrait(recentlyPlayedSongs: List<RecentlyPlayedWithSong>, onNavigate: (String) -> Unit) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        items(recentlyPlayedSongs) { recentlyPlayedWithSong ->
+            SongItemPortrait(recentlyPlayedWithSong.song, onNavigate)
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+fun RecommendedPlaylistsSection(newAddedSongs: List<Songs>, onNavigate: (String) -> Unit, isLandscape: Boolean) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 8.dp else 16.dp)
+    ) {
+        items(newAddedSongs) { song ->
+            SongItemRecommendedPortrait(song, onNavigate, isLandscape = isLandscape)
+        }
+    }
+}
+
+@Composable
+fun SongItemLandscape(
+    song: Songs,
+    onNavigate: (String) -> Unit,
+    isRecommended: Boolean = false
+) {
+    val context = LocalContext.current
+    val artworkUri = song.artwork?.let { Uri.parse(it) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clickable { onNavigate("songDetails/${song.id}") },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Image(
+            painter = rememberAsyncImagePainter(
+                ImageRequest.Builder(context).data(data = artworkUri).apply {
+                    crossfade(true)
+                }.build()
+            ),
+            contentDescription = if (isRecommended) "New Song Artwork" else "Recently Played Artwork",
+            modifier = Modifier
+                .size(56.dp)
+                .clip(RoundedCornerShape(4.dp)),
+            contentScale = ContentScale.Crop
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Column {
+            Text(text = song.name, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 16.sp, maxLines = 1)
+            Text(text = song.artist, fontSize = 12.sp, color = Color.Gray, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+fun SongItemRecommendedPortrait(
+    song: Songs,
+    onNavigate: (String) -> Unit,
+    isLandscape: Boolean
+) {
+    val context = LocalContext.current
+    val artworkUri = song.artwork?.let { Uri.parse(it) }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(if (isLandscape) 80.dp else 140.dp).clickable { onNavigate("songDetails/${song.id}") }
+    ) {
+        Image(
+            painter = rememberAsyncImagePainter(
+                ImageRequest.Builder(context).data(data = artworkUri).apply {
+                    crossfade(true)
+                }.build()
+            ),
+            contentDescription = song.name,
+            modifier = Modifier
+                .size(if (isLandscape) 80.dp else 140.dp)
+                .clip(RoundedCornerShape(4.dp)),
+            contentScale = ContentScale.Crop
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = song.name,
+            color = Color.White,
+            fontSize = if (isLandscape) 12.sp else 14.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1
+        )
+        Text(
+            text = song.artist,
+            color = Color.Gray,
+            fontSize = if (isLandscape) 10.sp else 12.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1
         )
     }
 }
 
 @Composable
-fun RecentlyPlayedSection(recentlyPlayedSongs: List<RecentlyPlayedWithSong>, onNavigate: (String) -> Unit) {
-    LazyColumn {
-        items(recentlyPlayedSongs) { recentlyPlayedWithSong ->
-            SongItem(recentlyPlayedWithSong.song, onNavigate, photoSize = 60)
-        }
-    }
-}
-
-@Composable
-fun RecommendedPlaylistsSection(newAddedSongs: List<Songs>, onNavigate: (String) -> Unit) {
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        items(newAddedSongs) { song ->
-            SongItem(song, onNavigate, photoSize = 140, isRecommended = true)
-        }
-    }
-}
-
-@Composable
-fun SongItem(
+fun SongItemPortrait(
     song: Songs,
-    onNavigate: (String) -> Unit,
-    isRecommended: Boolean = false,
-    photoSize: Int
+    onNavigate: (String) -> Unit
 ) {
     val context = LocalContext.current
     val artworkUri = song.artwork?.let { Uri.parse(it) }
-
-    if (isRecommended) {
-        // Tampilan untuk Recommended (New Added)
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.width(140.dp).clickable { onNavigate("songDetails/${song.id}") }
-        ) {
-            Image(
-                painter = rememberAsyncImagePainter(
-                    ImageRequest.Builder(context).data(data = artworkUri).apply {
-                        crossfade(true)
-                    }.build()
-                ),
-                contentDescription = song.name,
-                modifier = Modifier
-                    .size(140.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = song.name,
-                color = Color.White,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
-                text = song.artist,
-                color = Color.Gray,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium
-            )
-        }
-    } else {
-        Row(
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clickable { onNavigate("songDetails/${song.id}") },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Image(
+            painter = rememberAsyncImagePainter(
+                ImageRequest.Builder(context).data(data = artworkUri).apply {
+                    crossfade(true)
+                }.build()
+            ),
+            contentDescription = "Recently Played Artwork",
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
-                .clickable {
-                    onNavigate("songDetails/${song.id}")
-                },
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Image(
-                painter = rememberAsyncImagePainter(
-                    ImageRequest.Builder(context).data(data = artworkUri).apply {
-                        crossfade(true)
-                    }.build()
-                ),
-                contentDescription = "Artist Artwork",
-                modifier = Modifier
-                    .size(photoSize.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
-            )
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = song.name, fontWeight = FontWeight.Bold, color = Color.White)
-                Text(text = song.artist, fontSize = 12.sp, color = Color.Gray)
-            }
+                .size(60.dp)
+                .clip(RoundedCornerShape(4.dp)),
+            contentScale = ContentScale.Crop
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Column {
+            Text(text = song.name, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 16.sp, maxLines = 1)
+            Text(text = song.artist, fontSize = 12.sp, color = Color.Gray, maxLines = 1)
         }
     }
 }

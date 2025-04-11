@@ -1,6 +1,10 @@
 package com.example.purrytify.ui.screens.profile
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,42 +15,41 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.background
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.material3.*
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.sp
-import com.example.purrytify.ui.theme.PurrytifyTheme
-import com.example.purrytify.ui.theme.SpotifyGreen
-import androidx.compose.material.icons.filled.Settings
-import com.example.purrytify.R
-import androidx.compose.runtime.*
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import android.net.Uri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberAsyncImagePainter
+import com.example.purrytify.R
+import com.example.purrytify.ui.theme.PurrytifyTheme
+import com.example.purrytify.ui.theme.SpotifyGreen
 
 @Composable
 fun ProfileScreen(
@@ -57,6 +60,9 @@ fun ProfileScreen(
     val songsCount by viewModel.songsCount.collectAsState()
     val favoriteCount by viewModel.favoriteCount.collectAsState()
     val playedCount by viewModel.playedCount.collectAsState()
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val scrollState = rememberScrollState()
 
     LaunchedEffect(Unit) {
         viewModel.getProfile()
@@ -86,7 +92,8 @@ fun ProfileScreen(
                         1.0f to Color.Black
                     )
                 )
-            ),
+            )
+            .then(if (isLandscape) Modifier.verticalScroll(scrollState) else Modifier), // Tambahkan verticalScroll hanya saat landscape
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(40.dp))
@@ -147,7 +154,6 @@ fun ProfileScreen(
     }
 }
 
-
 @Composable
 fun ProfileMenuItem(
     title: String,
@@ -202,9 +208,11 @@ fun ProfileStat(value: String, label: String) {
         Text(label, fontSize = 12.sp, color = Color.LightGray)
     }
 }
-@Composable @Preview(showBackground = true)
+
+@Preview(showBackground = true)
+@Composable
 fun ProfileScreenPreview() {
-    PurrytifyTheme {
+    MaterialTheme {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -233,6 +241,8 @@ fun ProfileScreenPreview() {
                 ProfileStat("32", "LIKED")
                 ProfileStat("50", "LISTENED")
             }
+            Spacer(modifier = Modifier.height(60.dp))
+            ProfileMenuItem(title = "Settings", icon = Icons.Default.Settings, onClick = {})
         }
     }
 }
