@@ -2,55 +2,64 @@ package com.example.purrytify
 
 import android.os.Bundle
 import android.util.Log
-//import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-//import androidx.compose.runtime.mutableStateOf
-//import androidx.compose.runtime.remember
-//import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-//import com.example.purrytify.ui.screens.home.HomeScreen
 import com.example.purrytify.ui.screens.login.LoginScreen
-import com.example.purrytify.ui.theme.PurrytifyTheme
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.ui.navigation.AppNavigation
-
+import com.example.purrytify.ui.theme.PurrytifyTheme
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
-
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        NetworkMonitor.initialize(applicationContext)
         setContent {
             PurrytifyTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AppSelector()
+                    AppContent() // Tidak perlu meneruskan NetworkMonitor
                 }
             }
         }
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        NetworkMonitor.unregisterNetworkCallback(applicationContext) // Unregister Singleton di onDestroy
+    }
+}
+
+@Composable
+fun AppContent() {
+    val isConnected by NetworkMonitor.isConnected.collectAsState()
+    ConnectivityStatus(isConnected = isConnected)
+    AppSelector()
 }
 
 @Composable
 fun AppSelector(viewModel: MainViewModel = viewModel()) {
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
-
-
 
     LaunchedEffect(isLoggedIn) {
         Log.d("AppSelector", "Login state changed: isLoggedIn = $isLoggedIn")
@@ -74,6 +83,37 @@ fun AppSelector(viewModel: MainViewModel = viewModel()) {
         )
     }
 }
+
+@Composable
+fun ConnectivityStatus(isConnected: Boolean) {
+    val showDialog = remember { mutableStateOf(!isConnected) }
+
+    LaunchedEffect(isConnected) {
+        showDialog.value = !isConnected
+    }
+
+    if (showDialog.value) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!isConnected) {
+                    Log.d("ConnectivityStatus", "Tombol kembali ditekan saat tidak ada koneksi.")
+                } else {
+                    showDialog.value = false
+                }
+            },
+            title = { Text("Koneksi Terputus") },
+            text = { Text("Saat ini perangkat Anda tidak terhubung ke internet.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDialog.value = false
+                }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
 fun LoginScreenPreview() {

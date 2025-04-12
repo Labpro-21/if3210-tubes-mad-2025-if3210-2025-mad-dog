@@ -1,5 +1,6 @@
 package com.example.purrytify
 
+import NetworkMonitor
 import android.app.Application
 import android.util.Log
 import com.example.purrytify.data.auth.AuthRepository
@@ -14,6 +15,7 @@ class PurrytifyApplication : Application() {
         TokenManager.getInstance(this)
         AuthRepository.getInstance(this)
         TokenServiceManager.startTokenValidationService(this)
+        NetworkMonitor.initialize(this)
 
         Log.d("PurrytifyApp", "Application initialized")
     }

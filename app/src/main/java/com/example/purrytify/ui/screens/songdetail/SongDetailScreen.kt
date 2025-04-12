@@ -4,7 +4,6 @@ package com.example.purrytify.ui.screens.songdetail
 
 import android.content.Intent
 import android.graphics.drawable.BitmapDrawable
-import android.media.MediaPlayer
 import android.net.Uri
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -45,12 +44,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.net.toUri
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import com.example.purrytify.db.entity.Songs
@@ -60,17 +57,13 @@ import androidx.palette.graphics.Palette
 import coil.imageLoader
 import com.example.purrytify.MainViewModel
 import com.example.purrytify.ui.theme.SpotifyBlack
-import com.example.purrytify.ui.theme.SpotifyLightGray
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import com.example.purrytify.R
 import com.example.purrytify.ui.screens.library.UploadButton
 import com.example.purrytify.utils.MediaUtils
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SongDetailScreen(
     songId: Int,
@@ -81,8 +74,6 @@ fun SongDetailScreen(
     val uiState = viewModel.songDetails.collectAsState().value
     var showOptionsDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    val sheetState = rememberModalBottomSheetState()
     val isUpdateSuccessful by viewModel.isUpdateSuccessful.collectAsState()
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE

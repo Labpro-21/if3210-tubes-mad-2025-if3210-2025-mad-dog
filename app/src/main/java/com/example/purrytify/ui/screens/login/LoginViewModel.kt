@@ -23,10 +23,6 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
     private var _isUserInitiatedLogin = false
     val isUserInitiatedLogin: Boolean get() = _isUserInitiatedLogin
 
-    fun setUserInitiatedLogin(value: Boolean) {
-        _isUserInitiatedLogin = value
-        Log.d("LoginViewModel", "User initiated login set to: $value")
-    }
 
     init {
         checkLoginStatus()

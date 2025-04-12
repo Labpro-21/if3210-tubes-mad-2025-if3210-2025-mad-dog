@@ -10,7 +10,6 @@ import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.data.auth.AuthState
 import com.example.purrytify.db.AppDatabase
 import com.example.purrytify.db.entity.Songs
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -46,11 +45,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         observeAuthState()
     }
 
-    fun activateMiniPlayer() {
+    private fun activateMiniPlayer() {
         _isMiniPlayerActive.value = true
     }
 
-    fun deactivateMiniPlayer() {
+    private fun deactivateMiniPlayer() {
         _isMiniPlayerActive.value = false
     }
 
@@ -168,7 +167,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
 
 
-    fun releaseMediaPlayer() {
+    private fun releaseMediaPlayer() {
         mediaPlayer?.release()
         mediaPlayer = null
         _isPlaying.value = false

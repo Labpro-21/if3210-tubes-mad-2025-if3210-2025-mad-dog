@@ -12,13 +12,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
 import androidx.recyclerview.widget.RecyclerView
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import com.example.purrytify.R
 import com.example.purrytify.db.entity.Songs
-import java.io.File
 
 class SongAdapter(
     private val songs: List<Songs>,

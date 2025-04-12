@@ -1,10 +1,7 @@
 package com.example.purrytify.ui.screens.library
 
 import android.app.Application
-import android.content.Context
-import android.media.MediaMetadataRetriever
 import android.net.Uri
-import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import com.example.purrytify.utils.MediaUtils
@@ -14,7 +11,6 @@ import com.example.purrytify.db.AppDatabase
 import com.example.purrytify.db.entity.Songs
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
-import java.io.File
 import java.util.Date
 
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {

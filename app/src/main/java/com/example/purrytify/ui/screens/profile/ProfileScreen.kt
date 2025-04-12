@@ -21,13 +21,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,7 +48,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberAsyncImagePainter
 import com.example.purrytify.R
-import com.example.purrytify.ui.theme.PurrytifyTheme
 import com.example.purrytify.ui.theme.SpotifyGreen
 
 @Composable
@@ -60,6 +59,9 @@ fun ProfileScreen(
     val songsCount by viewModel.songsCount.collectAsState()
     val favoriteCount by viewModel.favoriteCount.collectAsState()
     val playedCount by viewModel.playedCount.collectAsState()
+    val isError by viewModel.isError.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val noInternet by viewModel.noInternet.collectAsState()
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val scrollState = rememberScrollState()
@@ -93,64 +95,104 @@ fun ProfileScreen(
                     )
                 )
             )
-            .then(if (isLandscape) Modifier.verticalScroll(scrollState) else Modifier), // Tambahkan verticalScroll hanya saat landscape
-        horizontalAlignment = Alignment.CenterHorizontally
+            .then(if (isLandscape) Modifier.verticalScroll(scrollState) else Modifier),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center // Untuk memusatkan konten error/no internet
     ) {
-        Spacer(modifier = Modifier.height(40.dp))
+        if (isLoading) {
+            CircularProgressIndicator(color = Color.White)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Memuat Profil...", color = Color.White)
+        } else if (noInternet) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Tidak ada koneksi",
+                    tint = Color.Gray,
+                    modifier = Modifier.size(64.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    "Tidak ada koneksi internet",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "Periksa koneksi Anda dan coba lagi.",
+                    color = Color.LightGray,
+                    fontSize = 14.sp
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = { viewModel.getProfile() },
+                    colors = ButtonDefaults.buttonColors(SpotifyGreen)
+                ) {
+                    Text("Coba Lagi", color = Color.White)
+                }
+            }
+        } else if (isError) {
+            Text("Gagal memuat profil.", color = Color.Red)
+        } else {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Spacer(modifier = Modifier.height(40.dp))
 
-        Box(contentAlignment = Alignment.BottomEnd) {
-            Image(
-                painter = profileImagePainter,
-                contentDescription = "Profile Picture",
-                modifier = Modifier
-                    .size(120.dp)
-                    .clip(CircleShape)
-                    .border(2.dp, Color.White, CircleShape)
-            )
+                Box(contentAlignment = Alignment.BottomEnd) {
+                    Image(
+                        painter = profileImagePainter,
+                        contentDescription = "Profile Picture",
+                        modifier = Modifier
+                            .size(120.dp)
+                            .clip(CircleShape)
+                            .border(2.dp, Color.White, CircleShape)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    profile?.username ?: "...",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+
+                Text(
+                    profile?.location ?: "...",
+                    fontSize = 14.sp,
+                    color = Color.LightGray
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = { },
+                    colors = ButtonDefaults.buttonColors(Color.DarkGray)
+                ) {
+                    Text("Edit Profile", color = Color.White)
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    ProfileStat(songsCount.toString(), "SONGS")
+                    ProfileStat(favoriteCount.toString(), "LIKED")
+                    ProfileStat(playedCount.toString(), "LISTENED")
+                }
+
+                Spacer(modifier = Modifier.height(60.dp))
+
+                ProfileMenuItem(
+                    title = "Settings",
+                    icon = Icons.Default.Settings,
+                    onClick = onNavigateToSettings
+                )
+            }
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            profile?.username ?: "Loading...",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
-        )
-
-        Text(
-            profile?.location ?: "Loading...",
-            fontSize = 14.sp,
-            color = Color.LightGray
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            onClick = { },
-            colors = ButtonDefaults.buttonColors(Color.DarkGray)
-        ) {
-            Text("Edit Profile", color = Color.White)
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            ProfileStat(songsCount.toString(), "SONGS")
-            ProfileStat(favoriteCount.toString(), "LIKED")
-            ProfileStat(playedCount.toString(), "LISTENED")
-        }
-
-        Spacer(modifier = Modifier.height(60.dp))
-
-        ProfileMenuItem(
-            title = "Settings",
-            icon = Icons.Default.Settings,
-            onClick = onNavigateToSettings
-        )
     }
 }
 

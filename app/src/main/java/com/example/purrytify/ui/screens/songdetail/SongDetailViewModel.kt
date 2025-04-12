@@ -3,14 +3,11 @@
 package com.example.purrytify.ui.screens.songdetail
 
 import android.app.Application
-import android.content.Context
-import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.db.AppDatabase
 import com.example.purrytify.db.entity.RecentlyPlayed
@@ -19,8 +16,6 @@ import com.example.purrytify.utils.MediaUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import java.io.File
-import java.io.FileOutputStream
 import java.util.Date
 
 class SongDetailViewModel(application: Application) : AndroidViewModel(application) {
