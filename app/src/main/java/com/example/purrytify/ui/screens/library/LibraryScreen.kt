@@ -9,10 +9,13 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -29,6 +32,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -62,6 +66,9 @@ fun LibraryScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
+    val searchQuery by libraryViewModel.searchQuery.collectAsState()
+    val isSearchActive = searchQuery.isNotEmpty()
+
     Box(modifier = Modifier.fillMaxSize()) {
         if (userId == null) {
             Column(
@@ -76,10 +83,17 @@ fun LibraryScreen(
                 )
             }
         } else {
-            val songsFlow = if (showAllSongs) {
-                libraryViewModel.allSongs.collectAsState(initial = emptyList()).value
-            } else {
-                libraryViewModel.favoriteSongs.collectAsState(initial = emptyList()).value
+            // Determine which songs to show based on search state and filter
+            val songsFlow = when {
+                isSearchActive -> {
+                    libraryViewModel.searchResults.collectAsState(initial = emptyList()).value
+                }
+                showAllSongs -> {
+                    libraryViewModel.allSongs.collectAsState(initial = emptyList()).value
+                }
+                else -> {
+                    libraryViewModel.favoriteSongs.collectAsState(initial = emptyList()).value
+                }
             }
 
             Column(modifier = Modifier.fillMaxSize()) {
@@ -112,30 +126,73 @@ fun LibraryScreen(
                         }
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Start
-                    ) {
-                        Button(
-                            onClick = { showAllSongs = true },
-                            modifier = Modifier.padding(top = 8.dp, end = 8.dp, bottom = 8.dp), // Padding selain kiri
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (showAllSongs) MaterialTheme.colorScheme.primary else Color.DarkGray,
-                                contentColor = if (showAllSongs) Color.Black else Color.White,
-                            )
-                        ) {
-                            Text(text = "All")
-                        }
+                    // Search bar
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { libraryViewModel.updateSearchQuery(it) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        placeholder = { Text("Search songs or artists", color = Color.Gray) },
+                        leadingIcon = { 
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = Color.Gray
+                            ) 
+                        },
+                        trailingIcon = { 
+                            if (isSearchActive) {
+                                IconButton(onClick = { libraryViewModel.updateSearchQuery("") }) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Clear search",
+                                        tint = Color.Gray
+                                    )
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color(0xFF212121),
+                            unfocusedContainerColor = Color(0xFF212121),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedIndicatorColor = Color.Gray,
+                            unfocusedIndicatorColor = Color.Gray,
+                            cursorColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
+                    )
 
-                        Button(
-                            onClick = { showAllSongs = false },
-                            modifier = Modifier.padding(top = 8.dp, end = 8.dp, bottom = 8.dp), // Padding selain kiri
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (!showAllSongs) MaterialTheme.colorScheme.primary else Color.DarkGray,
-                                contentColor = if (!showAllSongs) Color.Black else Color.White,
-                            )
+                    // Only show filter buttons if not in search mode
+                    if (!isSearchActive) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Start
                         ) {
-                            Text(text = "Liked")
+                            Button(
+                                onClick = { showAllSongs = true },
+                                modifier = Modifier.padding(top = 8.dp, end = 8.dp, bottom = 8.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (showAllSongs) MaterialTheme.colorScheme.primary else Color.DarkGray,
+                                    contentColor = if (showAllSongs) Color.Black else Color.White,
+                                )
+                            ) {
+                                Text(text = "All")
+                            }
+
+                            Button(
+                                onClick = { showAllSongs = false },
+                                modifier = Modifier.padding(top = 8.dp, end = 8.dp, bottom = 8.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (!showAllSongs) MaterialTheme.colorScheme.primary else Color.DarkGray,
+                                    contentColor = if (!showAllSongs) Color.Black else Color.White,
+                                )
+                            ) {
+                                Text(text = "Liked")
+                            }
                         }
                     }
 
@@ -144,7 +201,26 @@ fun LibraryScreen(
                 }
 
                 // RecyclerView Content
-                Column(modifier = Modifier.weight(1f).padding(8.dp)) {
+                if (isLandscape) {
+                    Row(modifier = Modifier.fillMaxSize()) {
+                        Column(modifier = Modifier
+                            .weight(1f)
+                            .padding(8.dp)) {
+                            AndroidView(
+                                factory = { context ->
+                                    val recyclerView = RecyclerView(context)
+                                    recyclerView.layoutManager = LinearLayoutManager(context)
+                                    recyclerView
+                                },
+                                update = { recyclerView ->
+                                    recyclerView.adapter = SongAdapter(songsFlow, onNavigate = { route -> navController.navigate(route) })
+                                    (recyclerView.adapter as SongAdapter).notifyDataSetChanged()
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+                } else {
                     AndroidView(
                         factory = { context ->
                             val recyclerView = RecyclerView(context)
@@ -160,6 +236,7 @@ fun LibraryScreen(
                 }
             }
 
+            // Add Song Dialog
             if (showAddSongDialog) {
                 if (isLandscape) {
                     Dialog(

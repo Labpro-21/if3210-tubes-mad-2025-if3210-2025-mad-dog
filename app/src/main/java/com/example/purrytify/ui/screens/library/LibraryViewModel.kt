@@ -10,6 +10,8 @@ import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.db.AppDatabase
 import com.example.purrytify.db.entity.Songs
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.util.Date
 
@@ -19,6 +21,9 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     private val context = application.applicationContext
     private val authRepository = AuthRepository.getInstance(application)
 
+
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery
 
     val userId: Int?
         get() = authRepository.currentUserId
@@ -42,6 +47,26 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 songDao.getFavoriteSongs()
             }
         }
+
+    val searchResults: Flow<List<Songs>>
+    get() {
+        val userId = this.userId
+        val query = _searchQuery.value
+        
+        if (userId == null) {
+            return kotlinx.coroutines.flow.flowOf(emptyList())
+        }
+        
+        return if (query.isEmpty()) {
+            songDao.getAllSongsForUser(userId)
+        } else {
+            songDao.searchSongsForUser(userId, query)
+        }
+    }
+        
+    fun updateSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
 
     fun addSong(uri: Uri?, artworkUri: Uri?, title: String, artist: String) {
         val userId = authRepository.currentUserId
