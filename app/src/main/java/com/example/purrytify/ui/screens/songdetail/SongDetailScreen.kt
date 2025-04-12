@@ -237,7 +237,7 @@ fun SongDetailsContent(
         }.build()
     )
     LaunchedEffect(currentPosition) {
-
+        // Optional: Do something on position change
     }
 
     LaunchedEffect(artworkUri) {
@@ -383,12 +383,21 @@ fun SongDetailsContent(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
-                Icon(
-                    imageVector = Icons.Filled.SkipPrevious,
-                    contentDescription = "Skip Previous",
-                    tint = Color.White,
-                    modifier = Modifier.size(if (isLandscape) 36.dp else 48.dp)
-                )
+                IconButton(onClick = {
+                    viewModel.skipPrevious(song.id) { previousSongId ->
+                        navController.navigate("songDetails/$previousSongId") {
+                            popUpTo("songDetails/{songId}") { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                }) {
+                    Icon(
+                        imageVector = Icons.Filled.SkipPrevious,
+                        contentDescription = "Skip Previous",
+                        tint = Color.White,
+                        modifier = Modifier.size(if (isLandscape) 36.dp else 48.dp)
+                    )
+                }
                 IconButton(onClick = {
                     mainViewModel.playSong(song)
                     viewModel.insertRecentlyPlayed(song.id)
@@ -400,16 +409,26 @@ fun SongDetailsContent(
                         modifier = Modifier.size(if (isLandscape) 48.dp else 64.dp)
                     )
                 }
-                Icon(
-                    imageVector = Icons.Filled.SkipNext,
-                    contentDescription = "Skip Next",
-                    tint = Color.White,
-                    modifier = Modifier.size(if (isLandscape) 36.dp else 48.dp)
-                )
+                IconButton(onClick = {
+                    viewModel.skipNext(song.id) { nextSongId ->
+                        navController.navigate("songDetails/$nextSongId") {
+                            popUpTo("songDetails/{songId}") { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                }) {
+                    Icon(
+                        imageVector = Icons.Filled.SkipNext,
+                        contentDescription = "Skip Next",
+                        tint = Color.White,
+                        modifier = Modifier.size(if (isLandscape) 36.dp else 48.dp)
+                    )
+                }
             }
         }
     }
 }
+
 
 
 

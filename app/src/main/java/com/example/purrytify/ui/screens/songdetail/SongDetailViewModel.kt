@@ -31,6 +31,25 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
     private val _songDetails = MutableStateFlow<SongDetailUiState>(SongDetailUiState.Loading)
     val songDetails: StateFlow<SongDetailUiState> = _songDetails
 
+    private val _userSongIds = MutableStateFlow<List<Int>>(emptyList())
+    val userSongIds: StateFlow<List<Int>> = _userSongIds
+
+    init {
+        loadUserSongIds()
+    }
+
+    private fun loadUserSongIds() {
+        viewModelScope.launch {
+            authRepository.currentUserId?.let { userId ->
+                songDao.getAllSongsForUser(userId).collect { songsList ->
+                    _userSongIds.value = songsList.map { it.id }
+                    Log.d("SongDetailViewModel", "Loaded user song IDs: ${_userSongIds.value}")
+                }
+            } ?: run {
+                Log.e("SongDetailViewModel", "User ID is null, cannot load song IDs")
+            }
+        }
+    }
     fun loadSongDetails(songId: Int) {
         viewModelScope.launch {
             try {
@@ -65,6 +84,39 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
             } else {
                 Log.e("SongDetailViewModel", "User ID is null, cannot insert recently played")
                 Toast.makeText(context, "User not logged in", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    fun skipNext(currentSongId: Int, onNavigate: (Int) -> Unit) {
+        val currentList = _userSongIds.value
+        val currentIndex = currentList.indexOf(currentSongId)
+
+        if (currentIndex != -1 && currentIndex < currentList.size - 1) {
+            val nextSongId = currentList[currentIndex + 1]
+            Log.d("SongDetailsViewModel: ", "Next Song ID: $nextSongId")
+
+            onNavigate(nextSongId)
+        } else {
+            if (currentList.isNotEmpty()) {
+                val firstSongId = currentList.first()
+                Log.d("SongDetailsViewModel: ", "FirstSong ID: $firstSongId")
+                onNavigate(firstSongId)
+            }
+        }
+    }
+    fun skipPrevious(currentSongId: Int, onNavigate: (Int) -> Unit) {
+        val currentList = _userSongIds.value
+        val currentIndex = currentList.indexOf(currentSongId)
+
+        if (currentIndex > 0) {
+            val previousSongId = currentList[currentIndex - 1]
+            onNavigate(previousSongId)
+        } else {
+            // Jika berada di lagu pertama, bisa putar ke akhir atau tidak melakukan apa-apa
+            // Contoh: putar ke akhir
+            if (currentList.isNotEmpty()) {
+                val lastSongId = currentList.last()
+                onNavigate(lastSongId)
             }
         }
     }
