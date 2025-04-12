@@ -5,41 +5,41 @@ Purrytify adalah aplikasi Android yang dibangun sebagai klon dari Spotify, menaw
 
 Android Jetpack Libraries:
 
-    Android Core KTX 
-    Android Lifecycle
-    Jetpack Compose UI:
-    Compose Material 3
-    Compose Material Icons Extended
-    Android Navigation Component
-    Android Room Persistence Library
-    Android DataStore
-    Android Security-Crypto
-    Android WorkManager
-    Android Palette KTX
-    Android RecyclerView
-    Android Core SplashScreen
-    Android Activity Compose
+    Android Core KTX
+    Android Lifecycle
+    Jetpack Compose UI:
+    Compose Material 3
+    Compose Material Icons Extended
+    Android Navigation Component
+    Android Room Persistence Library
+    Android DataStore
+    Android Security-Crypto
+    Android WorkManager
+    Android Palette KTX
+    Android RecyclerView
+    Android Core SplashScreen
+    Android Activity Compose
 Third-Party Libraries:
 
-    Retrofit
-    Gson Converter (Retrofit)
-    OkHttp Logging Interceptor
-    Kotlin Coroutines
-    Coil Compose
+    Retrofit
+    Gson Converter (Retrofit)
+    OkHttp Logging Interceptor
+    Kotlin Coroutines
+    Coil Compose
 
 Kotlin Standard Library:
 
-    Kotlin Script Runtime
+    Kotlin Script Runtime
 ## Screenshots
 ### Portrain Screenshots
-![alt image](screenshots/home.jpg)
-![alt image](screenshots/lib1.jpg)
-![alt image](screenshots/lib2.jpg)
-![alt image](screenshots/lib_add.jpg)
-![alt image](screenshots/detail1.jpg)
-![alt image](screenshots/detail2.jpg)
-![alt image](screenshots/edit_detail.jpg)
-![alt image](screenshots/profil.jpg)
+<img src="screenshots/home.jpg" width="300">
+<img src="screenshots/lib1.jpg" width="300">
+<img src="screenshots/lib2.jpg" width="300">
+<img src="screenshots/lib_add.jpg" width="300">
+<img src="screenshots/detail1.jpg" width="300">
+<img src="screenshots/detail2.jpg" width="300">
+<img src="screenshots/edit_detail.jpg" width="300">
+<img src="screenshots/profil.jpg" width="300">
 ### Landscape Screenshots
 ![alt image](screenshots/home_landscape.jpg)
 ![alt image](screenshots/lib_landscape.jpg)
@@ -48,19 +48,16 @@ Kotlin Standard Library:
 ![alt image](screenshots/profil_landscape.jpg)
 
 ## Pembagian Kerja
-| NIM      | Pembagian Kerja    | Jam |
+| NIM      | Pembagian Kerja    | Jam |
 |----------|--------------------|-----|
-| 13522136 | Header dan Navbar  | 2   |
-| 13522136 | Login              | 2   |
-| 13522150 | Home               | 5   |
-| 13522129 | Library            | 5   |
-| 13522129 | Media Player       | 5   |
-| 13522129 | Penambahan Lagu    | 2   |
-| 13522150 | Profile            | 3   |
-| 13522136 | Liked Songs        | 2   |
-| 13522150 | Background Service | 3   |
-| 13522129 | Network Sensing    | 2   |
-| 13522136 | BONUS - Searching  | 2   |
-
-
-
+| 13522136 | Header dan Navbar  | 2   |
+| 13522136 | Login              | 2   |
+| 13522150 | Home               | 5   |
+| 13522129 | Library            | 5   |
+| 13522129 | Media Player       | 5   |
+| 13522129 | Penambahan Lagu    | 2   |
+| 13522150 | Profile            | 3   |
+| 13522136 | Liked Songs        | 2   |
+| 13522150 | Background Service | 3   |
+| 13522129 | Network Sensing    | 2   |
+| 13522136 | BONUS - Searching  | 2   |
