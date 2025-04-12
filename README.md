@@ -34,13 +34,14 @@ Kotlin Standard Library:
 ### Portrain Screenshots
 <img src="screenshots/home.jpg" width="300">
 <img src="screenshots/lib1.jpg" width="300">
-<img src="screenshots/lib2.jpg" width="300">
+<img src="screenshots/lib3.jpg" width="300">
 <img src="screenshots/lib_add.jpg" width="300">
 <img src="screenshots/detail1.jpg" width="300">
 <img src="screenshots/detail2.jpg" width="300">
 <img src="screenshots/edit_detail.jpg" width="300">
 <img src="screenshots/profil.jpg" width="300">
 ### Landscape Screenshots
+
 ![alt image](screenshots/home_landscape.jpg)
 ![alt image](screenshots/lib_landscape.jpg)
 ![alt image](screenshots/detail_landscape.jpg)
