@@ -30,6 +30,22 @@ Third-Party Libraries:
 Kotlin Standard Library:
 
     Kotlin Script Runtime
+## Screenshots
+### Portrain Screenshots
+![alt image](screenshots/home.jpg)
+![alt image](screenshots/lib1.jpg)
+![alt image](screenshots/lib2.jpg)
+![alt image](screenshots/lib_add.jpg)
+![alt image](screenshots/detail1.jpg)
+![alt image](screenshots/detail2.jpg)
+![alt image](screenshots/edit_detail.jpg)
+![alt image](screenshots/profil.jpg)
+### Landscape Screenshots
+![alt image](screenshots/home_landscape.jpg)
+![alt image](screenshots/lib_landscape.jpg)
+![alt image](screenshots/detail_landscape.jpg)
+![alt image](screenshots/detail_landscape_edit.jpg)
+![alt image](screenshots/profil_landscape.jpg)
 
 ## Pembagian Kerja
 | NIM      | Pembagian Kerja    | Jam |
