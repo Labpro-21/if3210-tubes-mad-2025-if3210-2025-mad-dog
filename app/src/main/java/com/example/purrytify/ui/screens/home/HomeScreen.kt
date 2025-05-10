@@ -142,7 +142,9 @@ fun HomeScreenContent(
 @Composable
 fun TopBar(isLandscape: Boolean = false) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(start = if (isLandscape) 8.dp else 0.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = if (isLandscape) 8.dp else 0.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -198,19 +200,23 @@ fun RecommendedPlaylistsSection(newAddedSongs: List<Songs>, onNavigate: (String)
 @Composable
 fun ChartSection(onNavigate: (String) -> Unit, isLandscape: Boolean){
     val albums = listOf(
-        Triple("Chill Vibes", "Lo-Fi Beats", R.drawable.top50global),
-        Triple("Morning Energy", "Pop Boost", R.drawable.top50id)
+        Triple("GLOBAL", "Global", R.drawable.top50global),
+        Triple("ID", "Indonesia", R.drawable.top50id),
+        //Triple("USA", "United States of America", R.drawable.top50usa),
+        //Triple("UK", "United Kingdom", R.drawable.top50uk),
+
+
     )
 
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 8.dp else 16.dp)
     ) {
-        items(albums) { (albumName, artist, resId) ->
+        items(albums) { (region, artist, resId) ->
             AlbumItemRecommendedPortrait(
-                albumName = albumName,
+                region = region,
                 artist = artist,
                 artworkResId = resId,
-                onNavigate = { onNavigate("albumDetails/$albumName") },
+                onNavigate = { onNavigate("album/${region}") },
                 isLandscape = isLandscape
             )
         }
@@ -253,7 +259,7 @@ fun SongItemLandscape(
 }
 @Composable
 fun AlbumItemRecommendedPortrait(
-    albumName: String,
+    region: String,
     artist: String,
     @DrawableRes artworkResId: Int,
     onNavigate: () -> Unit,
@@ -267,7 +273,7 @@ fun AlbumItemRecommendedPortrait(
     ) {
         Image(
             painter = painterResource(id = artworkResId),
-            contentDescription = albumName,
+            contentDescription = region,
             modifier = Modifier
                 .size(if (isLandscape) 50.dp else 110.dp)
                 .clip(RoundedCornerShape(8.dp)),
@@ -275,7 +281,7 @@ fun AlbumItemRecommendedPortrait(
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = albumName,
+            text = region,
             color = Color.White,
             fontSize = if (isLandscape) 12.sp else 14.sp,
             fontWeight = FontWeight.Medium,
@@ -302,7 +308,9 @@ fun SongItemRecommendedPortrait(
     val artworkUri = song.artwork?.let { Uri.parse(it) }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(if (isLandscape) 50.dp else 110.dp).clickable { onNavigate("songDetails/${song.id}") }
+        modifier = Modifier
+            .width(if (isLandscape) 50.dp else 110.dp)
+            .clickable { onNavigate("songDetails/${song.id}") }
     ) {
         Image(
             painter = rememberAsyncImagePainter(

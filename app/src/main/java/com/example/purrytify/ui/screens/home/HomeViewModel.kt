@@ -19,7 +19,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val recentlyPlayedDao = AppDatabase.getDatabase(application).recentlyPlayedDao()
     private val songsDao = AppDatabase.getDatabase(application).songsDao()
     private val authRepository = AuthRepository.getInstance(application)
-    private val onlineSongRepository = OnlineSongRepository.getInstance(application)
     private val Tag = "HomeViewModel"
 
     val userId: Int?
@@ -53,9 +52,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
         Log.d(Tag, "User ID: $userId, Recently played songs: $recentlyPlayedSongs")
 
-        viewModelScope.launch {
-            val onlineSongResponses = onlineSongRepository.getOnlineSongResponses()
-            Log.d(Tag,"Fetched ${onlineSongResponses?.size?: 0} online songs" )
-        }
+
     }
 }

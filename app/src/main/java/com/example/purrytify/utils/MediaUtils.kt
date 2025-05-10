@@ -12,7 +12,7 @@ object MediaUtils {
         try {
             retriever.setDataSource(context, uri)
             val durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-            Log.d("Metadata", "Duration: $durationStr  URI: $uri")
+            Log.d("MediaUtils", "Duration: $durationStr  URI: $uri")
             return durationStr?.toLongOrNull() ?: 0L
         } catch (e: Exception) {
             e.printStackTrace()
