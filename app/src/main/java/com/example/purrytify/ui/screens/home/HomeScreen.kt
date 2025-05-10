@@ -2,6 +2,7 @@ package com.example.purrytify.ui.screens.home
 
 import android.net.Uri
 import android.util.Log
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,6 +31,7 @@ import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import com.example.purrytify.MainViewModel
+import com.example.purrytify.R
 import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.db.relationship.RecentlyPlayedWithSong
 
@@ -69,11 +72,10 @@ fun HomeScreenContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = if (isLandscape) 8.dp else 16.dp), // Adjust horizontal padding in landscape
+            .padding(horizontal = if (isLandscape) 8.dp else 16.dp),
     ) {
-        Spacer(modifier = Modifier.height(if (isLandscape) 0.dp else 8.dp)) // Reduce/remove top spacer in portrait
-        TopBar(isLandscape = isLandscape) // Pass isLandscape to TopBar
-
+        Spacer(modifier = Modifier.height(if (isLandscape) 0.dp else 8.dp))
+        //TopBar(isLandscape = isLandscape)
         Spacer(modifier = Modifier.height(if (isLandscape) 12.dp else 24.dp))
 
         if (isLandscape) {
@@ -105,8 +107,16 @@ fun HomeScreenContent(
             }
         } else {
             Text(
+                text = "Charts",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            ChartSection(onNavigate,isLandscape =false)
+            Text(
                 text = "New Songs For You",
-                fontSize = 24.sp,
+                fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )
@@ -185,6 +195,27 @@ fun RecommendedPlaylistsSection(newAddedSongs: List<Songs>, onNavigate: (String)
         }
     }
 }
+@Composable
+fun ChartSection(onNavigate: (String) -> Unit, isLandscape: Boolean){
+    val albums = listOf(
+        Triple("Chill Vibes", "Lo-Fi Beats", R.drawable.top50global),
+        Triple("Morning Energy", "Pop Boost", R.drawable.top50id)
+    )
+
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 8.dp else 16.dp)
+    ) {
+        items(albums) { (albumName, artist, resId) ->
+            AlbumItemRecommendedPortrait(
+                albumName = albumName,
+                artist = artist,
+                artworkResId = resId,
+                onNavigate = { onNavigate("albumDetails/$albumName") },
+                isLandscape = isLandscape
+            )
+        }
+    }
+}
 
 @Composable
 fun SongItemLandscape(
@@ -220,6 +251,46 @@ fun SongItemLandscape(
         }
     }
 }
+@Composable
+fun AlbumItemRecommendedPortrait(
+    albumName: String,
+    artist: String,
+    @DrawableRes artworkResId: Int,
+    onNavigate: () -> Unit,
+    isLandscape: Boolean
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .width(if (isLandscape) 50.dp else 110.dp)
+            .clickable { onNavigate() }
+    ) {
+        Image(
+            painter = painterResource(id = artworkResId),
+            contentDescription = albumName,
+            modifier = Modifier
+                .size(if (isLandscape) 50.dp else 110.dp)
+                .clip(RoundedCornerShape(8.dp)),
+            contentScale = ContentScale.Crop
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = albumName,
+            color = Color.White,
+            fontSize = if (isLandscape) 12.sp else 14.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1
+        )
+        Text(
+            text = artist,
+            color = Color.Gray,
+            fontSize = if (isLandscape) 10.sp else 12.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1
+        )
+    }
+}
+
 
 @Composable
 fun SongItemRecommendedPortrait(
@@ -231,7 +302,7 @@ fun SongItemRecommendedPortrait(
     val artworkUri = song.artwork?.let { Uri.parse(it) }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(if (isLandscape) 80.dp else 140.dp).clickable { onNavigate("songDetails/${song.id}") }
+        modifier = Modifier.width(if (isLandscape) 50.dp else 110.dp).clickable { onNavigate("songDetails/${song.id}") }
     ) {
         Image(
             painter = rememberAsyncImagePainter(
@@ -241,7 +312,7 @@ fun SongItemRecommendedPortrait(
             ),
             contentDescription = song.name,
             modifier = Modifier
-                .size(if (isLandscape) 80.dp else 140.dp)
+                .size(if (isLandscape) 50.dp else 110.dp)
                 .clip(RoundedCornerShape(4.dp)),
             contentScale = ContentScale.Crop
         )
