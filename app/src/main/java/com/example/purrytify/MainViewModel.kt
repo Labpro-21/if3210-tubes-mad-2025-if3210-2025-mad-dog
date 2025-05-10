@@ -1,8 +1,14 @@
 package com.example.purrytify
 
 import android.app.Application
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.media.MediaPlayer
 import android.net.Uri
+import android.os.Build
+import android.os.IBinder
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,6 +16,7 @@ import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.data.auth.AuthState
 import com.example.purrytify.db.AppDatabase
 import com.example.purrytify.db.entity.Songs
+import com.example.purrytify.services.MusicPlayerService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,7 +43,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var updatePositionJob: kotlinx.coroutines.Job? = null
 
     private var mediaPlayer: MediaPlayer? = null
-    val currentPosition: MutableStateFlow<Int> = MutableStateFlow(0) // Add this property
+    val currentPosition: MutableStateFlow<Int> = MutableStateFlow(0) 
+
+    private var musicService: MusicPlayerService? = null
+    fun startMusicService(mainActivity: MainActivity) {
+        Log.d("MainViewModel", "Starting music service")
+        val serviceIntent = Intent(getApplication(), MusicPlayerService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            getApplication<Application>().startForegroundService(serviceIntent)
+        } else {
+            getApplication<Application>().startService(serviceIntent)
+        }
+    }
+
+    fun updateMusicNotification(song: Songs) {
+        musicService?.updateNotification(song, _isPlaying.value)
+    }
 
     init {
         checkLoginStatus()
@@ -45,10 +67,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun activateMiniPlayer() {
         _isMiniPlayerActive.value = true
-    }
-
-    private fun deactivateMiniPlayer() {
+    }    private fun deactivateMiniPlayer() {
         _isMiniPlayerActive.value = false
+    }
+    
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            Log.d("MainViewModel", "Service connected")
+            val binder = service as? MusicPlayerService.LocalBinder
+            musicService = binder?.service
+            currentSong.value?.let { song ->
+                Log.d("MainViewModel", "Updating notification with current song: ${song.name}")
+                musicService?.updateNotification(song, isPlaying.value)
+            }
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            Log.d("MainViewModel", "Service disconnected")
+            musicService = null
+        }
     }
 
     private fun checkLoginStatus() {
@@ -110,10 +147,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         private const val TAG = "MainViewModel"
-    }
-
-    fun playSong(song: Songs) {
-        Log.d("IsPlayed Song", "Start${_isPlaying.value}")
+    }    fun playSong(song: Songs) {
+        Log.d("MainViewModel", "Playing song: ${song.name}, current song: ${_currentSong.value?.name}")
         if (_currentSong.value != song) {
             mediaPlayer?.release()
             mediaPlayer = MediaPlayer().apply {
@@ -135,16 +170,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             updateCurrentPosition(song.id)
             activateMiniPlayer()
+            
+            // Update notification after everything is set up
+            Log.d("MainViewModel", "Updating notification for new song: ${song.name}")
+            musicService?.updateNotification(song, true)
         } else {
             Log.d("IsPlayed Song", "Lagi playing diklik${_isPlaying.value}")
             if (_isPlaying.value) {
                 mediaPlayer?.pause()
                 updatePositionJob?.cancel()
                 _isPlaying.value = false
+                // Update notification when paused
+                musicService?.updateNotification(song, false)
             } else {
                 mediaPlayer?.start()
                 _isPlaying.value = true
                 updateCurrentPosition(song.id)
+                // Update notification when resumed
+                musicService?.updateNotification(song, true)
             }
         }
     }
@@ -155,6 +198,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         updatePositionJob?.cancel()
         deactivateMiniPlayer()
         _currentSong.value = null
+        musicService?.updateNotification(null, false)
+
     }
 
     private fun updateCurrentPosition(songId: Int) {
@@ -176,15 +221,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isPlaying.value = false
         _currentSong.value = null
         deactivateMiniPlayer()
+        musicService?.updateNotification(null, false)
     }
 
     fun seekTo(position: Int) {
         mediaPlayer?.seekTo(position)
         currentPosition.value = position
+    }    fun bindMusicService(context: Context) {
+        Log.d("MainViewModel", "Binding music service")
+        val intent = Intent(context, MusicPlayerService::class.java)
+        try {
+            val bound = context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+            Log.d("MainViewModel", "Service binding result: $bound")
+        } catch (e: Exception) {
+            Log.e("MainViewModel", "Error binding service", e)
+        }
     }
 
     override fun onCleared() {
         super.onCleared()
-        releaseMediaPlayer()
+        try {
+            getApplication<Application>().unbindService(serviceConnection)
+            Log.d("MainViewModel", "Service unbound in onCleared")
+        } catch (e: Exception) {
+            Log.e("MainViewModel", "Error unbinding service", e)
+        }
     }
 }

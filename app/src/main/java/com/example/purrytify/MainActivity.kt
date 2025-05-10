@@ -1,10 +1,14 @@
 package com.example.purrytify
 
+import android.content.pm.PackageManager
+import android.Manifest
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -19,6 +23,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.example.purrytify.ui.screens.login.LoginScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -26,12 +32,17 @@ import com.example.purrytify.ui.navigation.AppNavigation
 import com.example.purrytify.ui.theme.PurrytifyTheme
 
 class MainActivity : ComponentActivity() {
+    private val viewModel: MainViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         NetworkMonitor.initialize(applicationContext)
+        checkNotificationPermission()
+        viewModel.bindMusicService(this)
+        viewModel.startMusicService(this)
+
         setContent {
             PurrytifyTheme {
                 Surface(
@@ -47,6 +58,30 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         NetworkMonitor.unregisterNetworkCallback(applicationContext) // Unregister Singleton di onDestroy
+    }
+
+
+
+    private fun checkNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED) {
+                Log.d("MainActivity", "Requesting notification permission")
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    REQUEST_NOTIFICATION_PERMISSION
+                )
+            } else {
+                Log.d("MainActivity", "Notification permission already granted")
+            }
+        } 
+    }
+
+    companion object {
+        private const val REQUEST_NOTIFICATION_PERMISSION = 1
     }
 }
 
