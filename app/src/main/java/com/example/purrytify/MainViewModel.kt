@@ -68,7 +68,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         skipToNextNavigationCallback = skipToNext
         skipToPreviousNavigationCallback = skipToPrevious
         
-        // Update the MediaPlayerController to use these callbacks
         updateMediaControllerCallbacks()
     }
     
@@ -77,22 +76,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             mediaController?.skipToNextCallback = { songId ->
                 Log.d(TAG, "MediaController requesting skip to next for song: $songId")
                 val isOnline = _isOnlineSong.value
-                val region = "GLOBAL" // You might want to store the current region somewhere
+                val region = "GLOBAL" 
                 skipToNextNavigationCallback?.invoke(songId, isOnline, region) { nextSongId ->
-                    // This callback will be handled by navigation in the UI
                     Log.d(TAG, "Would navigate to next song: $nextSongId")
-                    // We don't navigate here, as this is handled by the caller
                 }
             }
             
             mediaController?.skipToPreviousCallback = { songId ->
                 Log.d(TAG, "MediaController requesting skip to previous for song: $songId")
                 val isOnline = _isOnlineSong.value
-                val region = "GLOBAL" // You might want to store the current region somewhere
+                val region = "GLOBAL" 
                 skipToPreviousNavigationCallback?.invoke(songId, isOnline, region) { prevSongId ->
-                    // This callback will be handled by navigation in the UI
                     Log.d(TAG, "Would navigate to previous song: $prevSongId")
-                    // We don't navigate here, as this is handled by the caller
                 }
             }
         }
