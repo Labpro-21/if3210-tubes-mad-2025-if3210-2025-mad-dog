@@ -22,7 +22,7 @@
         <!-- Google Maps API Key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyA99tcYGQmvGUhuNwn4H7KqKYx_yNuENOY" />
+            android:value="TAROH_API_KEY_DISINI" />
             
         <activity
             android:name=".MainActivity"
