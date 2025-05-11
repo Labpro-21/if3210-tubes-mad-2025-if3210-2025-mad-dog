@@ -6,6 +6,7 @@ import android.net.Uri
 import android.util.Log
 
 object MediaUtils {
+    private val tag = "MediaUtils"
 
     fun getAudioDuration(uri: Uri, context: Context): Long {
         val retriever = MediaMetadataRetriever()
@@ -40,5 +41,32 @@ object MediaUtils {
         }
 
         return Pair(title, artist)
+    }
+    fun parseDuration(durationString: String): Long {
+        return try {
+            val parts = durationString.split(":")
+
+            when (parts.size) {
+                2 -> {
+                    val minutes = parts[0].toLong()
+                    val seconds = parts[1].toLong()
+                    (minutes * 60 + seconds) * 1000
+                }
+
+                3 -> {
+                    val hours = parts[0].toLong()
+                    val minutes = parts[1].toLong()
+                    val seconds = parts[2].toLong()
+                    ((hours * 60 * 60) + (minutes * 60) + seconds) * 1000
+                }
+                else -> {
+                    Log.e(tag, "Unexpected duration format: $durationString")
+                    0L
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error parsing duration: ${durationString}, ${e.message}")
+            0L
+        }
     }
 }

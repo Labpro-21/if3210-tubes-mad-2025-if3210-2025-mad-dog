@@ -4,16 +4,30 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.data.auth.OnlineSongRepository
 import com.example.purrytify.data.model.OnlineSongResponse
+import com.example.purrytify.db.AppDatabase // Assuming this is your Room database class
+import com.example.purrytify.db.entity.Songs
+import com.example.purrytify.utils.DateConverter
+import com.example.purrytify.utils.DownloadUtils
+import com.example.purrytify.utils.MediaUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.io.File
+import java.util.Date
 import java.util.Locale
 
 class AlbumViewModel(application: Application) : AndroidViewModel(application) {
     private val onlineSongRepository = OnlineSongRepository.getInstance(application)
+    private val songsDao = AppDatabase.getDatabase(application).songsDao() // Get the SongsDao instance
     private val tag = "AlbumViewModel"
+    private val authRepository = AuthRepository.getInstance(application)
+    private val context = application.applicationContext // Get application context
+    private val _downloadProgress = MutableStateFlow<Pair<Int, Int>?>(null) // Pair<DownloadedCount, TotalCount>
+    val downloadProgress: StateFlow<Pair<Int, Int>?> = _downloadProgress
+
 
     private val _songs = MutableStateFlow<List<OnlineSongResponse>>(emptyList())
     val songs: StateFlow<List<OnlineSongResponse>> = _songs
@@ -23,6 +37,13 @@ class AlbumViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage
+
+    private val _onlineSongs = MutableStateFlow<List<OnlineSongResponse>>(emptyList())
+    val onlineSongs: StateFlow<List<OnlineSongResponse>> = _onlineSongs
+
+    fun getCurrentUserid(): Int {
+        return authRepository.currentUserId!!
+    }
 
     fun loadSongs(region: String) {
         viewModelScope.launch {
@@ -49,6 +70,50 @@ class AlbumViewModel(application: Application) : AndroidViewModel(application) {
                 _isLoading.value = false
             }
         }
+    }
+
+    fun downloadSongs(region: String, userId: Int) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+            try {
+                val fetchedSongs = if (region.uppercase(Locale.ROOT) == "GLOBAL") {
+                    onlineSongRepository.getTopGlobalSongs()
+                } else {
+                    onlineSongRepository.getTopCountrySongs(region.uppercase(Locale.ROOT))
+                }
+                if (fetchedSongs != null) {
+                    _onlineSongs.value = fetchedSongs
+                    Log.d(tag, "Loaded online Songs: ${_onlineSongs.value}")
+                    insertSongsIntoDb(fetchedSongs, userId)
+                } else {
+                    Log.e(tag, "Failed to load online songs: response was null")
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "Failed to load online songs: ${e.message}", e)
+                _errorMessage.value = "Failed to download songs: ${e.localizedMessage}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+
+    private suspend fun insertSongsIntoDb(onlineSongs: List<OnlineSongResponse>, userId: Int) {
+        val totalSongs = onlineSongs.size
+        var downloadedCount = 0
+
+        onlineSongs.forEach { onlineSong ->
+            val success = DownloadUtils.downloadAndInsertSingleSong(context, onlineSong, userId, songsDao)
+            if (success) {
+                downloadedCount++
+            } else {
+                Log.e(tag, "Failed to download and insert song: ${onlineSong.title}")
+            }
+            _downloadProgress.value = Pair(downloadedCount, totalSongs) // Update progress
+        }
+        Log.d(tag, "Attempted to download ${onlineSongs.size} songs.")
+        _downloadProgress.value = null // Reset progress when done
     }
 
     class Factory(val application: Application) : ViewModelProvider.Factory {

@@ -46,9 +46,7 @@ import java.util.Locale
 
 // Helper function to calculate total duration
 private fun calculateTotalDuration(songs: List<OnlineSongResponse>): String {
-    // Parse and sum durations (assuming format is "mm:ss")
     var totalSeconds = 0
-
     songs.forEach { song ->
         val parts = song.duration.split(":")
         if (parts.size == 2) {
@@ -57,11 +55,9 @@ private fun calculateTotalDuration(songs: List<OnlineSongResponse>): String {
             totalSeconds += minutes * 60 + seconds
         }
     }
-
     val hours = totalSeconds / 3600
     val minutes = (totalSeconds % 3600) / 60
     val seconds = totalSeconds % 60
-
     return if (hours > 0) {
         String.format("%d hr %02d min", hours, minutes)
     } else {
@@ -80,9 +76,10 @@ fun AlbumScreen(
         albumViewModel.loadSongs(region)
     }
 
-    val songs = albumViewModel.songs.collectAsState().value
-    val isLoading = albumViewModel.isLoading.collectAsState().value
-    val errorMessage = albumViewModel.errorMessage.collectAsState().value
+    val songs by albumViewModel.songs.collectAsState()
+    val isLoading by albumViewModel.isLoading.collectAsState()
+    val errorMessage by albumViewModel.errorMessage.collectAsState()
+    val downloadProgress by albumViewModel.downloadProgress.collectAsState()
     val context = LocalContext.current
 
     val imageName = "top50${region.lowercase(Locale.ROOT)}"
@@ -99,10 +96,10 @@ fun AlbumScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(dominantColor) // Set the background to the dominant color gradient
+            .background(dominantColor)
             .padding(horizontal = 16.dp)
     ) {
-        // Album Cover with Shadow
+        // Album Cover
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -120,25 +117,16 @@ fun AlbumScreen(
                     )
                     .clip(RoundedCornerShape(8.dp))
             ) {
-                if (imageId != 0) {
-                    Image(
-                        painter = painterResource(id = imageId),
-                        contentDescription = "Top 50 $region",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Image(
-                        painter = painterResource(id = R.drawable.music_placeholder),
-                        contentDescription = "Top 50 $region Placeholder",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
+                Image(
+                    painter = painterResource(id = artworkResource),
+                    contentDescription = "Top 50 $region",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
             }
         }
 
-        // Title
+        // Title and Description
         Text(
             text = "Top 50 ${region.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }}",
             style = MaterialTheme.typography.headlineSmall,
@@ -149,8 +137,6 @@ fun AlbumScreen(
                 .fillMaxWidth()
                 .padding(bottom = 8.dp)
         )
-
-        // Description
         Text(
             text = "The hottest tracks in ${region.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }} right now. Updated daily.",
             style = MaterialTheme.typography.bodyMedium,
@@ -161,7 +147,7 @@ fun AlbumScreen(
                 .padding(horizontal = 24.dp, vertical = 8.dp)
         )
 
-        // Total duration row
+        // Total duration
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -183,6 +169,7 @@ fun AlbumScreen(
             )
         }
 
+        // Download and Play Buttons
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -191,13 +178,14 @@ fun AlbumScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
-                onClick = { /* Handle download action */ },
+                onClick = { albumViewModel.downloadSongs(region = region, userId = albumViewModel.getCurrentUserid()) },
                 modifier = Modifier
                     .size(36.dp)
-                    .padding(start = 12.dp)
+                    .padding(start = 12.dp),
+                enabled = !isLoading && downloadProgress == null // Disable button when loading or downloading
             ) {
                 Icon(
-                    painter = painterResource(id = R.drawable.download), // Replace with actual download icon
+                    painter = painterResource(id = R.drawable.download),
                     contentDescription = "Download",
                     tint = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.size(36.dp)
@@ -213,7 +201,8 @@ fun AlbumScreen(
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF1DB954) // Spotify green
                 ),
-                contentPadding = PaddingValues(0.dp)
+                contentPadding = PaddingValues(0.dp),
+                enabled = songs.isNotEmpty() && downloadProgress == null // Enable only when songs are loaded and not downloading
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.play), // Replace with actual play icon
@@ -224,7 +213,32 @@ fun AlbumScreen(
             }
         }
 
-        if (isLoading) {
+        // Download Progress Indicator
+        if (downloadProgress != null) {
+            val (downloaded, total) = downloadProgress!!
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                LinearProgressIndicator(
+                    progress = if (total > 0) downloaded.toFloat() / total.toFloat() else 0f,
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Mengunduh $downloaded dari $total lagu",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        } else if (isLoading) {
+            // Loading Indicator for initial song fetch
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -232,19 +246,20 @@ fun AlbumScreen(
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
         } else if (errorMessage != null) {
+            // Error message
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = errorMessage,
+                    text = errorMessage!!,
                     color = MaterialTheme.colorScheme.error,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
         } else {
-            // Row-based list with rank numbers
+            // Song List
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(bottom = 16.dp)
@@ -270,7 +285,6 @@ fun SongItemRow(song: OnlineSongResponse, navController: NavController, region: 
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Rank number
         Text(
             text = song.rank.toString(),
             style = MaterialTheme.typography.titleMedium,
@@ -280,8 +294,6 @@ fun SongItemRow(song: OnlineSongResponse, navController: NavController, region: 
                 .padding(horizontal = 12.dp)
                 .width(24.dp)
         )
-
-        // Song artwork
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(song.artwork)
@@ -295,8 +307,6 @@ fun SongItemRow(song: OnlineSongResponse, navController: NavController, region: 
             placeholder = painterResource(id = R.drawable.music_placeholder),
             error = painterResource(id = R.drawable.music_placeholder)
         )
-
-        // Song info
         Column(
             modifier = Modifier
                 .padding(start = 12.dp)
@@ -318,6 +328,5 @@ fun SongItemRow(song: OnlineSongResponse, navController: NavController, region: 
                 overflow = TextOverflow.Ellipsis
             )
         }
-
     }
 }

@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,6 +51,7 @@ import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import com.example.purrytify.MainViewModel
 import com.example.purrytify.R
+import com.example.purrytify.data.model.OnlineSongResponse
 import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.ui.navigation.Screen
 import com.example.purrytify.ui.screens.library.UploadButton
@@ -68,6 +70,7 @@ fun SongDetailScreen(
     region: String = "GLOBAL",
 ) {
     val uiState by viewModel.songDetails.collectAsState()
+
     var showOptionsDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     val isUpdateSuccessful by viewModel.isUpdateSuccessful.collectAsState()
@@ -232,6 +235,8 @@ fun SongDetailsContent(
     val currentPosition by mainViewModel.currentPosition.collectAsState()
     val isPlaying by mainViewModel.isPlaying.collectAsState()
     val currentSong by mainViewModel.currentSong.collectAsState()
+    val isDownloading by viewModel.isDownloading.collectAsState()
+    val isAlreadyDownloaded by viewModel.isAlreadyDownloaded.collectAsState()
     val context = LocalContext.current
     val isSameSong = currentSong?.id == song.id
     val sliderPosition by remember(currentPosition, song.duration) {
@@ -336,7 +341,44 @@ fun SongDetailsContent(
                     )
                 }
 
-                if (!isOnline) {
+                if (isOnline) {
+                    Box(
+                        contentAlignment = Alignment.Center
+                    ) {
+                        when {
+                            isAlreadyDownloaded -> {
+                                // Show downloaded indicator
+                                Icon(
+                                    imageVector = Icons.Filled.Check,
+                                    contentDescription = "Already Downloaded",
+                                    tint = Color.Green,
+                                    modifier = Modifier.size(if (isLandscape) 36.dp else 48.dp)
+                                )
+                            }
+                            isDownloading -> {
+                                // Show loading indicator during download
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(if (isLandscape) 36.dp else 48.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                            else -> {
+                                // Show download button if not downloaded
+                                IconButton(onClick = {
+                                    viewModel.downloadSingleSong()
+                                }) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.download),
+                                        contentDescription = "Download Song",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(if (isLandscape) 36.dp else 48.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else {
                     IconButton(onClick = {
                         viewModel.toggleFavoriteStatus(song)
                     }) {
@@ -347,8 +389,6 @@ fun SongDetailsContent(
                             modifier = Modifier.size(if (isLandscape) 36.dp else 48.dp)
                         )
                     }
-                } else {
-                    Spacer(modifier = Modifier.size(24.dp)) // Use a fixed size
                 }
             }
 

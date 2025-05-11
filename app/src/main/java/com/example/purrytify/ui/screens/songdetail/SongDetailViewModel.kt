@@ -12,6 +12,7 @@ import com.example.purrytify.db.AppDatabase
 import com.example.purrytify.db.entity.RecentlyPlayed
 import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.data.model.OnlineSongResponse
+import com.example.purrytify.utils.DownloadUtils
 import com.example.purrytify.utils.MediaUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -43,9 +44,43 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
     private val _onlineSongs = MutableStateFlow<List<OnlineSongResponse>>(emptyList())
     val onlineSongs: StateFlow<List<OnlineSongResponse>> = _onlineSongs
     private val tag = "SongDetailViewModel"
+    private val _currentOnlineSongId = MutableStateFlow<Int?>(null)
+    val currentOnlineSongId: StateFlow<Int?> = _currentOnlineSongId
+
+    private val _currentOnlineRegion = MutableStateFlow<String>("GLOBAL")
+    val currentOnlineRegion: StateFlow<String> = _currentOnlineRegion
+
+    // Add state for tracking if the current song is already downloaded
+    private val _isAlreadyDownloaded = MutableStateFlow(false)
+    val isAlreadyDownloaded: StateFlow<Boolean> = _isAlreadyDownloaded
+
+    // Add state for tracking if a download is in progress
+    private val _isDownloading = MutableStateFlow(false)
+    val isDownloading: StateFlow<Boolean> = _isDownloading
 
     init {
         loadUserSongIds()
+    }
+    private fun setCurrentOnlineSongId(songId: Int?) {
+        _currentOnlineSongId.value = songId
+        Log.d(tag, "Current online song ID updated to: $songId")
+        // Check if this song is already downloaded when ID changes
+        songId?.let { checkIfAlreadyDownloaded(it) }
+    }
+
+    private fun setCurrentOnlineRegion(region: String) {
+        _currentOnlineRegion.value = region
+        Log.d(tag, "Current online region updated to: $region")
+    }
+
+    fun getCurrentOnlineSong(): OnlineSongResponse? {
+        val currentId = _currentOnlineSongId.value
+        return if (currentId != null) {
+            _onlineSongs.value.find { it.id == currentId }
+        } else {
+            Log.w(tag, "getCurrentOnlineSong: No current online song ID set.")
+            null
+        }
     }
 
     private fun loadUserSongIds() {
@@ -54,10 +89,22 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
                 songDao.getAllSongsForUser(userId).collect { songsList ->
                     _userSongIds.value = songsList.map { it.id }
                     Log.d(tag, "Loaded user song IDs: ${_userSongIds.value}")
+
+                    // Check if current online song is downloaded whenever user songs list changes
+                    _currentOnlineSongId.value?.let { checkIfAlreadyDownloaded(it) }
                 }
             } ?: run {
                 Log.e(tag, "User ID is null, cannot load song IDs")
             }
+        }
+    }
+
+    // New function to check if a song is already downloaded
+    private fun checkIfAlreadyDownloaded(songId: Int) {
+        viewModelScope.launch {
+            val isDownloaded = _userSongIds.value.contains(songId)
+            _isAlreadyDownloaded.value = isDownloaded
+            Log.d(tag, "Song ID $songId is already downloaded: $isDownloaded")
         }
     }
 
@@ -91,7 +138,16 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
             loadOnlineSongsSync()
         }
     }
-
+    fun getOnlineSongById(songId: Int, region: String = "GLOBAL"): OnlineSongResponse? {
+        Log.d(tag, "getOnlineSongById: Searching for song with ID $songId in region $region")
+        if (_onlineSongs.value.isEmpty()) {
+            Log.w(tag, "getOnlineSongById: Online songs list is empty. Consider calling loadOnlineSongs() first.")
+            return null
+        }
+        val foundSong = _onlineSongs.value.find { it.id == songId }
+        Log.d(tag, "getOnlineSongById: Found song: $foundSong")
+        return foundSong
+    }
     fun loadSongDetails(songId: Int, isOnline: Boolean = false, region: String = "GLOBAL") {
         viewModelScope.launch {
             _songDetails.value = SongDetailUiState.Loading // Set loading state
@@ -118,6 +174,8 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
                     Log.d(tag, "Online songs count: ${_onlineSongs.value.size}")
                     Log.d(tag, "Looking for song ID: $songId")
                     Log.d(tag, "Found online song: $onlineSong")
+                    setCurrentOnlineSongId(songId)
+                    setCurrentOnlineRegion(region)
 
                     if (onlineSong != null) {
                         // Map OnlineSongResponse to Songs (local database entity)
@@ -128,12 +186,15 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
                             artwork = onlineSong.artwork,
                             description = onlineSong.country,
                             filePath = onlineSong.url,
-                            duration = parseDuration(onlineSong.duration),
+                            duration = MediaUtils.parseDuration(onlineSong.duration),
                             isFavorite = false,
                             userId = authRepository.currentUserId ?: 0,
                             uploadDate = Date()
                         )
                         _songDetails.value = SongDetailUiState.Success(song)
+
+                        // Check if song is already downloaded
+                        checkIfAlreadyDownloaded(songId)
                     } else {
                         _songDetails.value = SongDetailUiState.Error("Online song not found")
                     }
@@ -315,7 +376,7 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
                 name = song.name,
                 artist = song.artist,
                 artwork = artworkPath,
-                filePath = audioPath.toString(),
+                filePath = audioPath!!,
                 duration = duration
             )
             songDao.updateSong(updatedSong)
@@ -333,32 +394,55 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
         _isUpdateSuccessful.value = false
     }
 
-    private fun parseDuration(durationString: String): Long {
-        return try {
-            val parts = durationString.split(":")
+    fun downloadSingleSong() {
+        val song = getCurrentOnlineSong() ?: return
 
-            when (parts.size) {
-                2 -> {
-                    val minutes = parts[0].toLong()
-                    val seconds = parts[1].toLong()
-                    (minutes * 60 + seconds) * 1000
-                }
-
-                3 -> {
-                    val hours = parts[0].toLong()
-                    val minutes = parts[1].toLong()
-                    val seconds = parts[2].toLong()
-                    ((hours * 60 * 60) + (minutes * 60) + seconds) * 1000
-                }
-                else -> {
-                    Log.e(tag, "Unexpected duration format: $durationString")
-                    0L
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(tag, "Error parsing duration: ${durationString}, ${e.message}")
-            0L
+        // Skip if already downloaded
+        if (_isAlreadyDownloaded.value) {
+            Toast.makeText(context, "${song.title} already downloaded", Toast.LENGTH_SHORT).show()
+            return
         }
+
+        // Set downloading state
+        _isDownloading.value = true
+        Toast.makeText(context, "Downloading ${song.title}", Toast.LENGTH_SHORT).show()
+
+        viewModelScope.launch {
+            try {
+                downloadSingleSongInternal()
+                // After download completes, update downloaded state
+                _isDownloading.value = false
+                _isAlreadyDownloaded.value = true
+                Toast.makeText(context, "Downloaded ${song.title} successfully", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                _isDownloading.value = false
+                Log.e(TAG, "Error downloading song: ${e.message}", e)
+                Toast.makeText(context, "Download failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private suspend fun downloadSingleSongInternal() {
+        val song = getCurrentOnlineSong()
+        Log.d(TAG, "Attempting to download song: ${song?.title} by ${song?.artist}")
+        val userId = authRepository.currentUserId!!
+        Log.d(TAG, "Current user ID: $userId")
+        val success = DownloadUtils.downloadAndInsertSingleSong(
+            context,
+            onlineSong = song!!,
+            userId = userId,
+            songsDao = songDao
+        )
+        if (success) {
+            Log.d(TAG, "Successfully downloaded and inserted song: ${song.title}")
+        } else {
+            Log.e(TAG, "Failed to download or insert song: ${song.title}")
+            throw Exception("Failed to download song")
+        }
+    }
+
+    companion object {
+        private const val TAG = "DownloadSingleSong"
     }
 
     sealed class SongDetailUiState {
