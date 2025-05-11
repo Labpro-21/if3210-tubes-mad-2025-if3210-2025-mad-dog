@@ -23,6 +23,7 @@ import com.example.purrytify.ui.components.LeftNavigationBar
 import com.example.purrytify.ui.components.MiniPlayer
 import com.example.purrytify.ui.screens.home.HomeScreen
 import com.example.purrytify.ui.screens.library.LibraryScreen
+import com.example.purrytify.ui.screens.profile.EditProfileScreen
 import com.example.purrytify.ui.screens.profile.ProfileScreen
 import com.example.purrytify.ui.screens.setting.SettingScreen
 import com.example.purrytify.ui.screens.songdetail.SongDetailScreen
@@ -34,6 +35,7 @@ sealed class Screen(val route: String) {
     object Profile : Screen("profile")
     object Settings : Screen("settings")
     object SongDetail : Screen("songDetails/{songId}")
+    object EditProfile : Screen("editProfile")
 }
 
 @Composable
@@ -49,7 +51,6 @@ fun AppNavigation(
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-
     val showNavigationBar = when (currentRoute) {
         Screen.Home.route, Screen.Library.route, Screen.Profile.route, Screen.SongDetail.route -> true
         else -> false
@@ -122,9 +123,27 @@ fun AppNavigation(
                     )
                 }
                 composable(Screen.Profile.route) {
+                    val backStackEntry = navController.previousBackStackEntry
+                    val profileUpdated = backStackEntry?.savedStateHandle?.get<Boolean>("profileUpdated") ?: false
+                    
                     ProfileScreen(
                         onNavigateToSettings = {
                             navController.navigate(Screen.Settings.route)
+                        },
+                        onNavigateToEditProfile = {
+                            navController.navigate(Screen.EditProfile.route)
+                        }
+                    )
+                    
+                    if (profileUpdated) {
+                        backStackEntry.savedStateHandle.remove<Boolean>("profileUpdated")
+                    }
+                }
+                composable(Screen.EditProfile.route) {
+                    EditProfileScreen(
+                        onNavigateBack = {
+                            navController.previousBackStackEntry?.savedStateHandle?.set("profileUpdated", true)
+                            navController.popBackStack()
                         }
                     )
                 }
