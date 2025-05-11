@@ -8,5 +8,7 @@ data class Users(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
     val name: String,
-    val totalplayed: Int = 0,
+    val totalPlayed: Int = 0,
+    val monthlyListeningTime: Long = 0, // Total waktu dengarkan dalam milidetik bulan ini
+    val lastUpdatedMonth: Int = 0 // Bulan terakhir data diperbarui
 )

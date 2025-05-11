@@ -7,14 +7,16 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.example.purrytify.db.dao.RecentlyPlayedDao
 import com.example.purrytify.db.dao.SongsDao
+import com.example.purrytify.db.dao.ListeningActivityDao // Tambahkan import untuk SoundCapsuleDao
 import com.example.purrytify.db.dao.UsersDao
 import com.example.purrytify.db.dao.UserWithSongsDao
+import com.example.purrytify.db.entity.ListeningActivity // Tambahkan entity ListeningActivity
 import com.example.purrytify.db.entity.RecentlyPlayed
 import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.db.entity.Users
 import com.example.purrytify.utils.DateConverter
 
-@Database(entities = [Songs::class, Users::class,RecentlyPlayed::class], version = 9) // Increment version!
+@Database(entities = [Songs::class, Users::class, RecentlyPlayed::class, ListeningActivity::class], version = 12)
 @TypeConverters(DateConverter::class)
 abstract class AppDatabase : RoomDatabase() {
 
@@ -22,6 +24,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun usersDao(): UsersDao
     abstract fun userWithSongsDao(): UserWithSongsDao
     abstract fun recentlyPlayedDao(): RecentlyPlayedDao
+    abstract fun listeningCapsuleDao(): ListeningActivityDao
 
     companion object {
         @Volatile

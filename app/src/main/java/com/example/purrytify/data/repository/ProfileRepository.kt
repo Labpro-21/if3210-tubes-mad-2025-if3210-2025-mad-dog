@@ -1,22 +1,20 @@
-package com.example.purrytify.data.auth
+package com.example.purrytify.data.repository
 
 import android.app.Application
 import com.example.purrytify.db.AppDatabase
 import android.content.Context
 import android.net.Uri
 import com.example.purrytify.data.api.NetworkModule
-import com.example.purrytify.data.api.ProfileApi
+import com.example.purrytify.data.auth.AuthRepository
+import com.example.purrytify.data.auth.TokenManager
 import com.example.purrytify.data.model.ProfileResponse
-import com.example.purrytify.data.model.UpdateProfileResponse
 import com.example.purrytify.db.dao.SongsDao
 import com.example.purrytify.db.dao.UsersDao
-import retrofit2.Response
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
-import okhttp3.RequestBody.Companion.create
 import java.io.File
 import java.io.FileOutputStream
 

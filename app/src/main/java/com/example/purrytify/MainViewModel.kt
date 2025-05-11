@@ -33,15 +33,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying
 
-
-
     private val _isMiniPlayerActive = MutableStateFlow(false)
     val isMiniPlayerActive: StateFlow<Boolean> = _isMiniPlayerActive
 
     private var updatePositionJob: kotlinx.coroutines.Job? = null
 
     private var mediaPlayer: MediaPlayer? = null
-    val currentPosition: MutableStateFlow<Int> = MutableStateFlow(0) // Add this property
+    val currentPosition: MutableStateFlow<Int> = MutableStateFlow(0)
+
+    private val _isPlaybackCompleted = MutableStateFlow(false) // New state flow
+    val isPlaybackCompleted: StateFlow<Boolean> = _isPlaybackCompleted
 
     init {
         checkLoginStatus()
@@ -59,6 +60,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setIsOnlineSong(isOnline: Boolean) {
         _isOnlineSong.value = isOnline
     }
+
     private fun checkLoginStatus() {
         viewModelScope.launch {
             try {
@@ -79,14 +81,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 when (state) {
                     is AuthState.Authenticated -> {
                         _isLoggedIn.value = true
-                        // Tambahkan logika untuk mematikan miniplayer saat login berhasil
                         deactivateMiniPlayer()
-                        stopPlaying() // Opsional: Hentikan juga pemutaran saat login
+                        stopPlaying()
                     }
                     is AuthState.NotAuthenticated -> {
                         _isLoggedIn.value = false
-                        deactivateMiniPlayer() // Opsional: Matikan juga saat logout
-                        stopPlaying()       // Opsional: Hentikan juga pemutaran saat logout
+                        deactivateMiniPlayer()
+                        stopPlaying()
                     }
                     else -> {}
                 }
@@ -104,11 +105,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 authRepository.logout()
                 Log.d(TAG, "Logout completed, isLoggedIn = ${_isLoggedIn.value}")
-                // Status NotAuthenticated akan di-emit oleh authRepository,
-                // dan logika di observeAuthState akan menangani deaktivasi miniplayer.
             } catch (e: Exception) {
                 Log.e(TAG, "Error during logout: ${e.message}")
-                // Force Logout
                 _isLoggedIn.value = false
                 deactivateMiniPlayer()
                 stopPlaying()
@@ -129,6 +127,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 prepare()
                 start()
                 _isPlaying.value = true
+                _isPlaybackCompleted.value = false // Reset completion status on new song
                 viewModelScope.launch {
                     Log.d("Increment played: ", "${usersDao.getTotalPlayedById(authRepository.currentUserId)}")
                     authRepository.currentUserId?.let { usersDao.incrementTotalPlayed(it) }
@@ -139,6 +138,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     updatePositionJob?.cancel()
                     deactivateMiniPlayer()
                     _currentSong.value = null
+                    _isPlaybackCompleted.value = true
+                    viewModelScope.launch {
+                        delay(500)
+                        _isPlaybackCompleted.value = false
+                    }
                 }
             }
             updateCurrentPosition(song.id)
@@ -153,6 +157,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 mediaPlayer?.start()
                 _isPlaying.value = true
                 updateCurrentPosition(song.id)
+                _isPlaybackCompleted.value = false // Reset if resumed
             }
         }
     }
@@ -163,6 +168,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         updatePositionJob?.cancel()
         deactivateMiniPlayer()
         _currentSong.value = null
+        _isPlaybackCompleted.value = false // Reset on stop
     }
 
     private fun updateCurrentPosition(songId: Int) {
@@ -184,11 +190,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isPlaying.value = false
         _currentSong.value = null
         deactivateMiniPlayer()
+        _isPlaybackCompleted.value = false // Reset on release
     }
 
     fun seekTo(position: Int) {
         mediaPlayer?.seekTo(position)
         currentPosition.value = position
+        _isPlaybackCompleted.value = false // Reset if user seeks
     }
 
     override fun onCleared() {

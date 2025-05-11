@@ -7,7 +7,7 @@ import android.location.Location
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.purrytify.data.auth.ProfileRepository
+import com.example.purrytify.data.repository.ProfileRepository
 import com.example.purrytify.data.model.ProfileResponse
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.flow.MutableStateFlow
