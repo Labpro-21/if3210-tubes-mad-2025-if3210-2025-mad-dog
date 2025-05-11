@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.rememberNavController
 import coil.compose.rememberAsyncImagePainter
 import com.example.purrytify.R
 import com.example.purrytify.ui.theme.SpotifyGreen
@@ -86,7 +87,10 @@ import java.util.Locale
 @Composable
 fun EditProfileScreen(
     viewModel: ProfileViewModel = viewModel(),
-    onNavigateBack: () -> Unit = {}
+    onNavigateBack: () -> Unit = {},
+    onNavigateToLocationPicker: () -> Unit = {},
+    countryCode: String? = null,
+    countryName: String? = null
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -98,12 +102,21 @@ fun EditProfileScreen(
     var photoUri by remember { mutableStateOf<Uri?>(null) }
     var showPhotoPickerDialog by remember { mutableStateOf(false) }
     var locationInput by remember { mutableStateOf(profile?.location ?: "") }
-    var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
-    
-    // Fetch profile when screen is first loaded
+    var selectedCountryName by remember { mutableStateOf<String?>(null) }
+    var tempCameraUri by remember { mutableStateOf<Uri?>(null) }    
     LaunchedEffect(Unit) {
         viewModel.getProfile()
     }
+    
+    // Handle country code and country name from navigation parameters
+    LaunchedEffect(countryCode, countryName) {
+        if (!countryCode.isNullOrEmpty()) {
+            locationInput = countryCode
+            selectedCountryName = countryName
+        }
+    }
+    
+   nstead, we'll rely on the actual navigation argument passing when the user returns from the map screen
     
     fun createImageUri(context: Context): Uri {
         val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
@@ -125,7 +138,7 @@ fun EditProfileScreen(
     // Permission launchers
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
+    ) { permissions -> 
         val allGranted = permissions.values.all { it }
         if (allGranted) {
             viewModel.getCurrentLocation(context) {
@@ -192,20 +205,9 @@ fun EditProfileScreen(
             }
         }
     }
-
     // Google Maps intent
     fun openGoogleMaps() {
-        try {
-            val mapIntent = Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q="))
-            mapIntent.setPackage("com.google.android.apps.maps")
-            if (mapIntent.resolveActivity(context.packageManager) != null) {
-                context.startActivity(mapIntent)
-            } else {
-                Toast.makeText(context, "Google Maps is not installed", Toast.LENGTH_SHORT).show()
-            }
-        } catch (e: Exception) {
-            Toast.makeText(context, "Could not open Google Maps", Toast.LENGTH_SHORT).show()
-        }
+        onNavigateToLocationPicker()
     }
     LaunchedEffect(currentLocation) {
         currentLocation?.let {
@@ -443,7 +445,6 @@ fun EditProfileScreen(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Current Location", color = Color.White)
                         }
-
                         OutlinedButton(
                             onClick = { openGoogleMaps() },
                             modifier = Modifier.weight(1f),
@@ -457,14 +458,17 @@ fun EditProfileScreen(
                                 contentDescription = "Open Maps"
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Choose on Map", color = Color.White)
+                            Text("Select on Map", color = Color.White)
                         }
                     }
-
                     Text(
-                        text = "Location should be a 2-letter country code \nExample: US for United States, ID for Indonesia",
+                        text = if (selectedCountryName != null) {
+                            "Selected country: $selectedCountryName ($locationInput)"
+                        } else {
+                            "Location should be a 2-letter country code \nExample: US for United States, ID for Indonesia"
+                        },
                         fontSize = 12.sp,
-                        color = Color.Gray,
+                        color = if (selectedCountryName != null) SpotifyGreen else Color.Gray,
                         textAlign = TextAlign.Center,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -479,7 +483,10 @@ fun EditProfileScreen(
                             .fillMaxWidth()
                             .height(50.dp),
                         colors = ButtonDefaults.buttonColors(SpotifyGreen)
-                    ) {                        Text("Save Changes", fontWeight = FontWeight.Bold)                    }                }
+                    ) {
+                        Text("Save Changes", fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
     }

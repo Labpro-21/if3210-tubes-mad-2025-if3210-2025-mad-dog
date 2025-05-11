@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -24,6 +25,7 @@ import com.example.purrytify.ui.components.MiniPlayer
 import com.example.purrytify.ui.screens.home.HomeScreen
 import com.example.purrytify.ui.screens.library.LibraryScreen
 import com.example.purrytify.ui.screens.profile.EditProfileScreen
+import com.example.purrytify.ui.screens.profile.MapsPickerScreen
 import com.example.purrytify.ui.screens.profile.ProfileScreen
 import com.example.purrytify.ui.screens.setting.SettingScreen
 import com.example.purrytify.ui.screens.songdetail.SongDetailScreen
@@ -36,6 +38,7 @@ sealed class Screen(val route: String) {
     object Settings : Screen("settings")
     object SongDetail : Screen("songDetails/{songId}")
     object EditProfile : Screen("editProfile")
+    object LocationPicker : Screen("locationPicker")
 }
 
 @Composable
@@ -136,13 +139,42 @@ fun AppNavigation(
                     )
                     
                     if (profileUpdated) {
-                        backStackEntry.savedStateHandle.remove<Boolean>("profileUpdated")
+                        if (backStackEntry != null) {
+                            backStackEntry.savedStateHandle.remove<Boolean>("profileUpdated")
+                        }
                     }
                 }
                 composable(Screen.EditProfile.route) {
+                    val countryCode = navController.currentBackStackEntry?.savedStateHandle?.get<String>("selectedCountryCode")
+                    val countryName = navController.currentBackStackEntry?.savedStateHandle?.get<String>("selectedCountryName")
+                    
                     EditProfileScreen(
                         onNavigateBack = {
                             navController.previousBackStackEntry?.savedStateHandle?.set("profileUpdated", true)
+                            navController.popBackStack()
+                        },
+                        onNavigateToLocationPicker = {
+                            navController.navigate(Screen.LocationPicker.route)
+                        },
+                        countryCode = countryCode,
+                        countryName = countryName
+                    )
+                    
+                    // If data was passed from the location picker, remove it to prevent reprocessing
+                    LaunchedEffect(countryCode, countryName) {
+                        if (countryCode != null && countryName != null) {
+                            navController.currentBackStackEntry?.savedStateHandle?.remove<String>("selectedCountryCode")
+                            navController.currentBackStackEntry?.savedStateHandle?.remove<String>("selectedCountryName")
+                        }
+                    }
+                }
+                composable(Screen.LocationPicker.route) {
+                    MapsPickerScreen(
+                        onNavigateBack = { countryCode, countryName ->
+                            if (countryCode.isNotEmpty()) {
+                                navController.previousBackStackEntry?.savedStateHandle?.set("selectedCountryCode", countryCode)
+                                navController.previousBackStackEntry?.savedStateHandle?.set("selectedCountryName", countryName)
+                            }
                             navController.popBackStack()
                         }
                     )
