@@ -202,10 +202,13 @@ fun ChartSection(onNavigate: (String) -> Unit, isLandscape: Boolean){
     val albums = listOf(
         Triple("GLOBAL", "Global", R.drawable.top50global),
         Triple("ID", "Indonesia", R.drawable.top50id),
-        //Triple("USA", "United States of America", R.drawable.top50usa),
-        //Triple("UK", "United Kingdom", R.drawable.top50uk),
-
-
+        Triple("MY", "Malaysia", R.drawable.top50my),
+        Triple("US", "United States", R.drawable.top50usa),
+        Triple("GB", "United Kingdom", R.drawable.top50uk),
+        Triple("CH", "Switzerland", R.drawable.top50ch),
+        Triple("DE", "Germany", R.drawable.top50de),
+        Triple("BR", "Brazil", R.drawable.top50br),
+        
     )
 
     LazyRow(

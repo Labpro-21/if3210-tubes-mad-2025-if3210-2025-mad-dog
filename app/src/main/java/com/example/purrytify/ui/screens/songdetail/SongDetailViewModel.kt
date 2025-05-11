@@ -46,7 +46,6 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
 
     init {
         loadUserSongIds()
-        loadOnlineSongs() // Load online songs when ViewModel is initialized
     }
 
     private fun loadUserSongIds() {
@@ -64,6 +63,7 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
 
     private suspend fun loadOnlineSongsSync(region: String = "GLOBAL"): Boolean {
         return try {
+            Log.d(tag,"loadOnlineSongsSync Region: $region")
             withContext(Dispatchers.IO) {
                 val onlinesongs: List<OnlineSongResponse>? = if (region == "GLOBAL") {
                     onlineSongRepository.getTopGlobalSongs()
@@ -92,7 +92,7 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun loadSongDetails(songId: Int, isOnline: Boolean = false) {
+    fun loadSongDetails(songId: Int, isOnline: Boolean = false, region: String = "GLOBAL") {
         viewModelScope.launch {
             _songDetails.value = SongDetailUiState.Loading // Set loading state
 
@@ -102,7 +102,7 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
                     var loadedSuccessfully = false
                     if (_onlineSongs.value.isEmpty()) {
                         Log.d(tag, "Online songs empty, loading now...")
-                        loadedSuccessfully = loadOnlineSongsSync()
+                        loadedSuccessfully = loadOnlineSongsSync(region)
                         Log.d(tag, "Online songs loaded successfully: $loadedSuccessfully")
                     } else {
                         loadedSuccessfully = true
@@ -114,6 +114,7 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
                     }
 
                     val onlineSong = _onlineSongs.value.find { it.id == songId }
+                    Log.d(tag, "Album Region: ${region}")
                     Log.d(tag, "Online songs count: ${_onlineSongs.value.size}")
                     Log.d(tag, "Looking for song ID: $songId")
                     Log.d(tag, "Found online song: $onlineSong")
@@ -152,8 +153,8 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun insertRecentlyPlayed(songId: Int,isOnline: Boolean = false) {
-        if(!isOnline){
+    fun insertRecentlyPlayed(songId: Int, isOnline: Boolean = false) {
+        if (!isOnline) {
             viewModelScope.launch {
                 val userId = authRepository.currentUserId
 
@@ -176,27 +177,42 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
                 }
             }
         }
-
     }
 
-    fun skipNext(currentSongId: Int, isOnline: Boolean, onNavigate: (Int) -> Unit) {
+    fun skipNext(currentSongId: Int, isOnline: Boolean, currentRegion: String = "GLOBAL", onNavigate: (Int) -> Unit) {
         viewModelScope.launch {
             if (isOnline) {
-                // Handle skip logic for online songs
+                if (_onlineSongs.value.isEmpty()) {
+                    val loaded = loadOnlineSongsSync(currentRegion) // Try to reload
+                    if (!loaded) {
+                        // Handle error: could not load songs
+                        Log.d(tag, "Failed to load online songs for region: $currentRegion")
+                        return@launch
+                    }
+                }
+
+                Log.d(tag, "----- Online Songs for Region: $currentRegion -----")
+                _onlineSongs.value.forEachIndexed { index, onlineSong ->
+                    Log.d(tag, "[$index] ID: ${onlineSong.id}, Title: ${onlineSong.title}, Artist: ${onlineSong.artist}, Artwork: ${onlineSong.artwork}, URL: ${onlineSong.url}, Duration: ${onlineSong.duration}")
+                }
+                Log.d(tag, "--------------------------------------------------")
+
                 val currentOnlineSong = _onlineSongs.value.find { it.id == currentSongId }
                 val currentIndex = _onlineSongs.value.indexOf(currentOnlineSong)
+                Log.d(tag, "currentOnlineSong: $currentOnlineSong")
+                Log.d(tag, "currentIndex: $currentIndex")
 
                 if (currentIndex != -1 && currentIndex < _onlineSongs.value.size - 1) {
                     val nextSongId = _onlineSongs.value[currentIndex + 1].id
                     onNavigate(nextSongId)
                 } else {
+                    // If at the end of the list, loop back to the beginning
                     if (_onlineSongs.value.isNotEmpty()) {
                         val firstSongId = _onlineSongs.value.first().id
                         onNavigate(firstSongId)
                     }
                 }
             } else {
-                // Handle skip logic for local songs
                 val currentList = _userSongIds.value
                 val currentIndex = currentList.indexOf(currentSongId)
 
@@ -205,6 +221,7 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
                     Log.d("SongDetailsViewModel: ", "Next Song ID: $nextSongId")
                     onNavigate(nextSongId)
                 } else {
+                    // If at the end of the local list, loop back to the beginning
                     if (currentList.isNotEmpty()) {
                         val firstSongId = currentList.first()
                         Log.d("SongDetailsViewModel: ", "FirstSong ID: $firstSongId")
@@ -215,16 +232,34 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun skipPrevious(currentSongId: Int, isOnline: Boolean, onNavigate: (Int) -> Unit) {
+    fun skipPrevious(currentSongId: Int, isOnline: Boolean, currentRegion: String = "GLOBAL", onNavigate: (Int) -> Unit) {
         viewModelScope.launch {
             if (isOnline) {
+                if (_onlineSongs.value.isEmpty()) {
+                    val loaded = loadOnlineSongsSync(currentRegion) // Try to reload
+                    if (!loaded) {
+                        // Handle error: could not load songs
+                        Log.d(tag, "Failed to load online songs for region: $currentRegion")
+                        return@launch
+                    }
+                }
+
+                Log.d(tag, "----- Online Songs for Region: $currentRegion -----")
+                _onlineSongs.value.forEachIndexed { index, onlineSong ->
+                    Log.d(tag, "[$index] ID: ${onlineSong.id}, Title: ${onlineSong.title}, Artist: ${onlineSong.artist}, Artwork: ${onlineSong.artwork}, URL: ${onlineSong.url}, Duration: ${onlineSong.duration}")
+                }
+                Log.d(tag, "--------------------------------------------------")
+
                 val currentOnlineSong = _onlineSongs.value.find { it.id == currentSongId }
                 val currentIndex = _onlineSongs.value.indexOf(currentOnlineSong)
+                Log.d(tag, "currentOnlineSong: $currentOnlineSong")
+                Log.d(tag, "currentIndex: $currentIndex")
 
                 if (currentIndex > 0) {
                     val previousSongId = _onlineSongs.value[currentIndex - 1].id
                     onNavigate(previousSongId)
                 } else {
+                    // If at the beginning of the list, loop to the end
                     if (_onlineSongs.value.isNotEmpty()) {
                         val lastSongId = _onlineSongs.value.last().id
                         onNavigate(lastSongId)
@@ -238,6 +273,7 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
                     val previousSongId = currentList[currentIndex - 1]
                     onNavigate(previousSongId)
                 } else {
+                    // If at the beginning of the local list, loop to the end
                     if (currentList.isNotEmpty()) {
                         val lastSongId = currentList.last()
                         onNavigate(lastSongId)

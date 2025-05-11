@@ -34,8 +34,8 @@ sealed class Screen(val route: String) {
     object Library : Screen("library")
     object Profile : Screen("profile")
     object Settings : Screen("settings")
-    object SongDetail : Screen("songDetails/{songId}")  // Route for local songs
-    object SongDetailOnline : Screen("songDetails/online/{songId}") // Route for online songs
+    object SongDetail : Screen("songDetails/{songId}")
+    object SongDetailOnline : Screen("songDetails/online/{region}/{songId}")
     object Album: Screen("album/{region}")
 }
 
@@ -87,7 +87,9 @@ fun AppNavigation(
                                 onMiniPlayerClick = {
                                     if (mainViewModel.currentSong.value != null) {
                                         val route = if (isOnlinePlaying) {
-                                            Screen.SongDetailOnline.route.replace("{songId}", mainViewModel.currentSong.value!!.id.toString())
+                                            Screen.SongDetailOnline.route
+                                                .replace("{region}", "GLOBAL") // You might need to determine the actual region
+                                                .replace("{songId}", mainViewModel.currentSong.value!!.id.toString())
                                         } else {
                                             Screen.SongDetail.route.replace("{songId}", mainViewModel.currentSong.value!!.id.toString())
                                         }
@@ -170,14 +172,19 @@ fun AppNavigation(
                 }
                 composable(
                     Screen.SongDetailOnline.route,
-                    arguments = listOf(navArgument("songId") { type = NavType.IntType })
+                    arguments = listOf(
+                        navArgument("region") { type = NavType.StringType },
+                        navArgument("songId") { type = NavType.IntType }
+                    )
                 ) { backStackEntry ->
+                    val region = backStackEntry.arguments?.getString("region") ?: "GLOBAL"
                     val songId = backStackEntry.arguments?.getInt("songId") ?: -1
                     SongDetailScreen(
                         songId = songId,
                         navController = navController,
                         mainViewModel = mainViewModel,
-                        isOnline = true
+                        isOnline = true,
+                        region = region
                     )
                 }
             }

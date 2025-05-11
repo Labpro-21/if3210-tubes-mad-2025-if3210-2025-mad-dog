@@ -51,6 +51,7 @@ import coil.request.ImageRequest
 import com.example.purrytify.MainViewModel
 import com.example.purrytify.R
 import com.example.purrytify.db.entity.Songs
+import com.example.purrytify.ui.navigation.Screen
 import com.example.purrytify.ui.screens.library.UploadButton
 import com.example.purrytify.ui.theme.SpotifyBlack
 import com.example.purrytify.utils.ColorUtils
@@ -64,7 +65,7 @@ fun SongDetailScreen(
     navController: NavController,
     mainViewModel: MainViewModel,
     isOnline: Boolean,
-    region: String? = null,
+    region: String = "GLOBAL",
 ) {
     val uiState by viewModel.songDetails.collectAsState()
     var showOptionsDialog by remember { mutableStateOf(false) }
@@ -73,9 +74,9 @@ fun SongDetailScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
-    LaunchedEffect(songId, isOnline) {
+    LaunchedEffect(songId, isOnline, region) {
         mainViewModel.setIsOnlineSong(isOnline)
-        viewModel.loadSongDetails(songId, isOnline = isOnline)
+        viewModel.loadSongDetails(songId, isOnline = isOnline, region = region)
     }
     LaunchedEffect(isUpdateSuccessful) {
         if (isUpdateSuccessful) {
@@ -99,7 +100,8 @@ fun SongDetailScreen(
                 mainViewModel = mainViewModel,
                 isLandscape = isLandscape,
                 onOptionClick = { showOptionsDialog = true },
-                isOnline = isOnline
+                isOnline = isOnline,
+                currentRegion = region
             )
             if (showEditDialog) {
                 Dialog(
@@ -224,7 +226,8 @@ fun SongDetailsContent(
     mainViewModel: MainViewModel,
     isLandscape: Boolean,
     onOptionClick: () -> Unit,
-    isOnline: Boolean
+    isOnline: Boolean,
+    currentRegion: String
 ) {
     val currentPosition by mainViewModel.currentPosition.collectAsState()
     val isPlaying by mainViewModel.isPlaying.collectAsState()
@@ -387,10 +390,19 @@ fun SongDetailsContent(
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
                 IconButton(onClick = {
-                    viewModel.skipPrevious(song.id, isOnline = isOnline) { previousSongId ->
-                        navController.navigate("songDetails/$previousSongId") {
-                            popUpTo("songDetails/{songId}") { inclusive = true }
-                            launchSingleTop = true
+                    if (!isOnline) {
+                        viewModel.skipPrevious(song.id, isOnline = false) { previousSongId ->
+                            navController.navigate(Screen.SongDetail.route.replace("{songId}", previousSongId.toString())) {
+                                popUpTo(Screen.SongDetail.route.replace("{songId}", song.id.toString())) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    } else {
+                        viewModel.skipPrevious(song.id, isOnline = true, currentRegion = currentRegion) { previousSongId ->
+                            navController.navigate(Screen.SongDetailOnline.route.replace("{region}", currentRegion).replace("{songId}", previousSongId.toString())) {
+                                popUpTo(Screen.SongDetailOnline.route.replace("{region}", currentRegion).replace("{songId}", song.id.toString())) { inclusive = true }
+                                launchSingleTop = true
+                            }
                         }
                     }
                 }) {
@@ -413,10 +425,19 @@ fun SongDetailsContent(
                     )
                 }
                 IconButton(onClick = {
-                    viewModel.skipNext(song.id, isOnline = isOnline) { nextSongId ->
-                        navController.navigate("songDetails/$nextSongId") {
-                            popUpTo("songDetails/{songId}") { inclusive = true }
-                            launchSingleTop = true
+                    if (!isOnline) {
+                        viewModel.skipNext(song.id, isOnline = false) { nextSongId ->
+                            navController.navigate(Screen.SongDetail.route.replace("{songId}", nextSongId.toString())) {
+                                popUpTo(Screen.SongDetail.route.replace("{songId}", song.id.toString())) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    } else {
+                        viewModel.skipNext(song.id, isOnline = true, currentRegion = currentRegion) { nextSongId ->
+                            navController.navigate(Screen.SongDetailOnline.route.replace("{region}", currentRegion).replace("{songId}", nextSongId.toString())) {
+                                popUpTo(Screen.SongDetailOnline.route.replace("{region}", currentRegion).replace("{songId}", song.id.toString())) { inclusive = true }
+                                launchSingleTop = true
+                            }
                         }
                     }
                 }) {
@@ -596,4 +617,3 @@ fun EditSongDialogContent(
         }
     }
 }
-
