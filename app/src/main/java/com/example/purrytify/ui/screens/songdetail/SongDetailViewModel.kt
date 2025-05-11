@@ -30,8 +30,8 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
     private val context = application.applicationContext
     private val recentlyPlayedDao = AppDatabase.getDatabase(application).recentlyPlayedDao()
     private val listenActivityDao = AppDatabase.getDatabase(application).listeningCapsuleDao()
-    private val authRepository = AuthRepository.getInstance(application)
     private val listenActivityRepository = ListeningActivityRepository.getInstance(listenActivityDao)
+    private val authRepository = AuthRepository.getInstance(application)
     private val onlineSongRepository = OnlineSongRepository.getInstance(application)
     private val _isUpdateSuccessful = MutableStateFlow(false)
     val isUpdateSuccessful: StateFlow<Boolean> = _isUpdateSuccessful
@@ -120,6 +120,7 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
     fun insertListeningActivity(song: Songs, isOnline: Boolean = false) {
+        Log.d(tag,"InsertListeningActivity: isOnline: $isOnline")
         if (!isOnline) {
             viewModelScope.launch {
                 val userId = authRepository.currentUserId

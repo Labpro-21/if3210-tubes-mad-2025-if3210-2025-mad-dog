@@ -70,7 +70,7 @@ fun SongDetailScreen(
     region: String = "GLOBAL",
 ) {
     val uiState by viewModel.songDetails.collectAsState()
-    val playbackCompletedState by mainViewModel.isPlaybackCompleted.collectAsState()
+    //val playbackCompletedState by mainViewModel.isPlaybackCompleted.collectAsState()
 
     var showOptionsDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
@@ -79,7 +79,7 @@ fun SongDetailScreen(
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     viewModel.setOnline(isOnline)
 
-
+    /*
     LaunchedEffect(playbackCompletedState) {
         if (playbackCompletedState) {
             Log.d("SongDetailScreen", "Playback completed for song ID: $songId")
@@ -89,7 +89,7 @@ fun SongDetailScreen(
             Log.d("SongDetailScreen", "Playback is active or not completed for song ID: $songId")
         }
     }
-
+*/
     LaunchedEffect(songId, isOnline, region) {
         mainViewModel.setIsOnlineSong(isOnline)
         viewModel.loadSongDetails(songId, isOnline = isOnline, region = region)

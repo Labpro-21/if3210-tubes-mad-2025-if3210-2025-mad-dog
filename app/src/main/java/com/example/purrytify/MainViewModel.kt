@@ -1,8 +1,11 @@
 package com.example.purrytify
 
 import android.app.Application
-import android.media.MediaPlayer
-import android.net.Uri
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
+import android.os.IBinder
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,22 +13,25 @@ import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.data.auth.AuthState
 import com.example.purrytify.db.AppDatabase
 import com.example.purrytify.db.entity.Songs
+import com.example.purrytify.services.AudioPlayerService
+import com.example.purrytify.services.AudioPlayerService.PlaybackServiceBinder
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val authRepository = AuthRepository.getInstance(application)
+    private val usersDao = AppDatabase.getDatabase(application).usersDao()
 
     private val _isLoggedIn = MutableStateFlow(false)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn
 
     private val _isOnlineSong = MutableStateFlow(false)
     val isOnlineSong: StateFlow<Boolean> = _isOnlineSong
-
-    private val usersDao = AppDatabase.getDatabase(application).usersDao()
 
     private val _currentSong = MutableStateFlow<Songs?>(null)
     val currentSong: StateFlow<Songs?> = _currentSong
@@ -36,17 +42,94 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isMiniPlayerActive = MutableStateFlow(false)
     val isMiniPlayerActive: StateFlow<Boolean> = _isMiniPlayerActive
 
-    private var updatePositionJob: kotlinx.coroutines.Job? = null
+    private val _currentPosition = MutableStateFlow(0)
+    val currentPosition: StateFlow<Int> = _currentPosition
 
-    private var mediaPlayer: MediaPlayer? = null
-    val currentPosition: MutableStateFlow<Int> = MutableStateFlow(0)
+    // Binder untuk berinteraksi dengan AudioPlayerService
+    private var serviceBinder: AudioPlayerService.PlaybackServiceBinder? = null
+    private var positionUpdateJob: Job? = null
 
-    private val _isPlaybackCompleted = MutableStateFlow(false) // New state flow
-    val isPlaybackCompleted: StateFlow<Boolean> = _isPlaybackCompleted
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(className: ComponentName, service: IBinder) {
+            Log.d(TAG, "Service Connected")
+            serviceBinder = service as PlaybackServiceBinder
+            // Pass the current isOnlineSong value to the service
+            serviceBinder?.setIsOnlineSong(_isOnlineSong.value)
+
+            // Setelah terhubung, kita bisa mendapatkan status pemutaran dari Service
+            updatePlayerStateFromService()
+            startPositionUpdates()
+
+            // Observe LiveData from service
+            serviceBinder?.getService()?.isPlaying?.observeForever { isPlaying ->
+                _isPlaying.value = isPlaying
+                if (isPlaying) {
+                    startPositionUpdates()
+                } else {
+                    positionUpdateJob?.cancel()
+                }
+            }
+
+            serviceBinder?.getService()?.currentSongLiveData?.observeForever { song ->
+                _currentSong.value = song
+                if (song != null) {
+                    activateMiniPlayer()
+                } else {
+                    deactivateMiniPlayer()
+                }
+            }
+        }
+
+        override fun onServiceDisconnected(className: ComponentName) {
+            Log.d(TAG, "Service Disconnected")
+            positionUpdateJob?.cancel()
+            serviceBinder = null
+        }
+    }
 
     init {
         checkLoginStatus()
         observeAuthState()
+        bindToAudioPlayerService()
+    }
+
+    private fun updatePlayerStateFromService() {
+        serviceBinder?.let { binder ->
+            _isPlaying.value = binder.isPlaying
+            _currentPosition.value = binder.currentPosition
+            _currentSong.value = binder.currentSong
+
+            if (binder.currentSong != null) {
+                activateMiniPlayer()
+            }
+        }
+    }
+
+    private fun startPositionUpdates() {
+        positionUpdateJob?.cancel()
+        positionUpdateJob = viewModelScope.launch {
+            while (isActive && _isPlaying.value) {
+                serviceBinder?.let { binder ->
+                    _currentPosition.value = binder.currentPosition
+                }
+                delay(500) // Update every 500ms for smoother slider movement
+            }
+        }
+    }
+
+    private fun bindToAudioPlayerService() {
+        Intent(getApplication(), AudioPlayerService::class.java).also { intent ->
+            getApplication<Application>().bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        // Important: Remove LiveData observers to prevent memory leaks
+        serviceBinder?.getService()?.isPlaying?.removeObserver { }
+        serviceBinder?.getService()?.currentSongLiveData?.removeObserver { }
+        positionUpdateJob?.cancel()
+        getApplication<Application>().unbindService(serviceConnection)
     }
 
     private fun activateMiniPlayer() {
@@ -59,6 +142,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setIsOnlineSong(isOnline: Boolean) {
         _isOnlineSong.value = isOnline
+        // Update the service with the new value if it's bound
+        serviceBinder?.setIsOnlineSong(isOnline)
     }
 
     private fun checkLoginStatus() {
@@ -81,8 +166,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 when (state) {
                     is AuthState.Authenticated -> {
                         _isLoggedIn.value = true
-                        deactivateMiniPlayer()
-                        stopPlaying()
                     }
                     is AuthState.NotAuthenticated -> {
                         _isLoggedIn.value = false
@@ -114,93 +197,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    companion object {
-        private const val TAG = "MainViewModel"
-    }
-
     fun playSong(song: Songs) {
-        Log.d("IsPlayed Song", "Start${_isPlaying.value}")
-        if (_currentSong.value != song) {
-            mediaPlayer?.release()
-            mediaPlayer = MediaPlayer().apply {
-                setDataSource(getApplication(), Uri.parse(song.filePath))
-                prepare()
-                start()
-                _isPlaying.value = true
-                _isPlaybackCompleted.value = false // Reset completion status on new song
-                viewModelScope.launch {
-                    Log.d("Increment played: ", "${usersDao.getTotalPlayedById(authRepository.currentUserId)}")
+        viewModelScope.launch {
+            // First stop current playback to avoid conflicts
+            if (_isPlaying.value && _currentSong.value != song) {
+                serviceBinder?.stopPlayback()
+            }
+
+            // Pass isOnlineSong to the startPlayback method
+            val activityId = serviceBinder?.startPlayback(song, _isOnlineSong.value)
+
+            if (serviceBinder?.isPlaying == true) {
+                activateMiniPlayer()
+                // Only increment play count if it's not an online song
+                if (!_isOnlineSong.value) {
                     authRepository.currentUserId?.let { usersDao.incrementTotalPlayed(it) }
                 }
-                _currentSong.value = song
-                setOnCompletionListener {
-                    _isPlaying.value = false
-                    updatePositionJob?.cancel()
-                    deactivateMiniPlayer()
-                    _currentSong.value = null
-                    _isPlaybackCompleted.value = true
-                    viewModelScope.launch {
-                        delay(500)
-                        _isPlaybackCompleted.value = false
-                    }
-                }
             }
-            updateCurrentPosition(song.id)
-            activateMiniPlayer()
-        } else {
-            Log.d("IsPlayed Song", "Lagi playing diklik${_isPlaying.value}")
-            if (_isPlaying.value) {
-                mediaPlayer?.pause()
-                updatePositionJob?.cancel()
-                _isPlaying.value = false
-            } else {
-                mediaPlayer?.start()
-                _isPlaying.value = true
-                updateCurrentPosition(song.id)
-                _isPlaybackCompleted.value = false // Reset if resumed
-            }
+        }
+    }
+
+    fun togglePlayPause() {
+        _currentSong.value?.let { song ->
+            // Pass isOnlineSong to the startPlayback method
+            serviceBinder?.startPlayback(song, _isOnlineSong.value)
         }
     }
 
     fun stopPlaying() {
-        mediaPlayer?.pause()
-        _isPlaying.value = false
-        updatePositionJob?.cancel()
-        deactivateMiniPlayer()
-        _currentSong.value = null
-        _isPlaybackCompleted.value = false // Reset on stop
-    }
-
-    private fun updateCurrentPosition(songId: Int) {
-        updatePositionJob?.cancel()
-        updatePositionJob = viewModelScope.launch {
-            while (mediaPlayer != null && mediaPlayer?.isPlaying == true) {
-                val currentMediaPlayerPosition = mediaPlayer?.currentPosition ?: 0
-                if (currentSong.value?.id == songId && currentPosition.value != currentMediaPlayerPosition) {
-                    currentPosition.value = currentMediaPlayerPosition
-                }
-                delay(1000)
-            }
-        }
-    }
-
-    private fun releaseMediaPlayer() {
-        mediaPlayer?.release()
-        mediaPlayer = null
-        _isPlaying.value = false
-        _currentSong.value = null
-        deactivateMiniPlayer()
-        _isPlaybackCompleted.value = false // Reset on release
+        serviceBinder?.stopPlayback()
     }
 
     fun seekTo(position: Int) {
-        mediaPlayer?.seekTo(position)
-        currentPosition.value = position
-        _isPlaybackCompleted.value = false // Reset if user seeks
+        serviceBinder?.seekTo(position)
+        _currentPosition.value = position
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        releaseMediaPlayer()
+    companion object {
+        private const val TAG = "MainViewModel"
     }
 }
