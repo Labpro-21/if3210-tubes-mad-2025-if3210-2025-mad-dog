@@ -1,8 +1,14 @@
 package com.example.purrytify
 
 import android.app.Application
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.media.MediaPlayer
 import android.net.Uri
+import android.os.Build
+import android.os.IBinder
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,9 +16,12 @@ import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.data.auth.AuthState
 import com.example.purrytify.db.AppDatabase
 import com.example.purrytify.db.entity.Songs
+import com.example.purrytify.media.MediaPlaybackService
+import com.example.purrytify.media.MediaPlayerController
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -33,22 +42,129 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying
 
-
-
     private val _isMiniPlayerActive = MutableStateFlow(false)
     val isMiniPlayerActive: StateFlow<Boolean> = _isMiniPlayerActive
 
+    private val _currentPosition = MutableStateFlow(0)
+    val currentPosition: StateFlow<Int> = _currentPosition
+
+    // For backward compatibility
+    private var mediaPlayer: MediaPlayer? = null
+    
+    // Service connection
+    private var mediaController: MediaPlayerController? = null
+    private var serviceConnection: ServiceConnection? = null
+    private var serviceBound = false
     private var updatePositionJob: kotlinx.coroutines.Job? = null
 
-    private var mediaPlayer: MediaPlayer? = null
-    val currentPosition: MutableStateFlow<Int> = MutableStateFlow(0) // Add this property
+    // Navigation callbacks for media controller
+    private var skipToNextNavigationCallback: ((Int, Boolean, String, (Int) -> Unit) -> Unit)? = null
+    private var skipToPreviousNavigationCallback: ((Int, Boolean, String, (Int) -> Unit) -> Unit)? = null
+    
+    fun registerNavigationCallbacks(
+        skipToNext: (Int, Boolean, String, (Int) -> Unit) -> Unit,
+        skipToPrevious: (Int, Boolean, String, (Int) -> Unit) -> Unit
+    ) {
+        skipToNextNavigationCallback = skipToNext
+        skipToPreviousNavigationCallback = skipToPrevious
+        
+        updateMediaControllerCallbacks()
+    }
+    
+    private fun updateMediaControllerCallbacks() {
+        if (serviceBound && mediaController != null) {
+            mediaController?.skipToNextCallback = { songId ->
+                Log.d(TAG, "MediaController requesting skip to next for song: $songId")
+                val isOnline = _isOnlineSong.value
+                val region = "GLOBAL" 
+                skipToNextNavigationCallback?.invoke(songId, isOnline, region) { nextSongId ->
+                    Log.d(TAG, "Would navigate to next song: $nextSongId")
+                }
+            }
+            
+            mediaController?.skipToPreviousCallback = { songId ->
+                Log.d(TAG, "MediaController requesting skip to previous for song: $songId")
+                val isOnline = _isOnlineSong.value
+                val region = "GLOBAL" 
+                skipToPreviousNavigationCallback?.invoke(songId, isOnline, region) { prevSongId ->
+                    Log.d(TAG, "Would navigate to previous song: $prevSongId")
+                }
+            }
+        }
+    }
 
     init {
         checkLoginStatus()
         observeAuthState()
-    }
+        bindMediaService()
+    }    private fun bindMediaService() {
+        val context = getApplication<Application>().applicationContext
+        val serviceIntent = Intent(context, MediaPlaybackService::class.java)
+        
+        serviceConnection = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                val binder = service as MediaPlaybackService.LocalBinder
+                mediaController = binder.getMediaController()
+                serviceBound = true
+                
+                // Setup callbacks
+                mediaController?.setCallbacks(
+                    onSkipToNext = { songId -> skipNext(songId) },
+                    onSkipToPrevious = { songId -> skipPrevious(songId) },
+                    onPlaybackFinished = {
+                        _isPlaying.value = false
+                        _isMiniPlayerActive.value = false
+                        _currentSong.value = null
+                    }
+                )
+                
+                // Update navigation callbacks if they're already registered
+                updateMediaControllerCallbacks()
+                
+                // Observe controller states
+                observeMediaControllerStates()
+            }
 
-    private fun activateMiniPlayer() {
+            override fun onServiceDisconnected(name: ComponentName?) {
+                mediaController = null
+                serviceBound = false
+            }
+        }
+        
+        // Start and bind the service
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(serviceIntent)
+        } else {
+            context.startService(serviceIntent)
+        }
+        
+        context.bindService(serviceIntent, serviceConnection!!, Context.BIND_AUTO_CREATE)
+    }
+    
+    private fun observeMediaControllerStates() {
+        viewModelScope.launch {
+            mediaController?.isPlaying?.collectLatest { isPlaying ->
+                _isPlaying.value = isPlaying
+            }
+        }
+        
+        viewModelScope.launch {
+            mediaController?.currentSong?.collectLatest { song ->
+                if (song != null) {
+                    _currentSong.value = song
+                    _isMiniPlayerActive.value = true
+                } else {
+                    _isMiniPlayerActive.value = false
+                }
+            }
+        }
+        
+        viewModelScope.launch {
+            mediaController?.currentPosition?.collectLatest { position ->
+                _currentPosition.value = position
+            }
+        }
+    }    private fun activateMiniPlayer() {
         _isMiniPlayerActive.value = true
     }
 
@@ -58,8 +174,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setIsOnlineSong(isOnline: Boolean) {
         _isOnlineSong.value = isOnline
-    }
-    private fun checkLoginStatus() {
+    }    private fun checkLoginStatus() {
         viewModelScope.launch {
             try {
                 val loggedIn = authRepository.isLoggedIn()
@@ -79,14 +194,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 when (state) {
                     is AuthState.Authenticated -> {
                         _isLoggedIn.value = true
-                        // Tambahkan logika untuk mematikan miniplayer saat login berhasil
-                        deactivateMiniPlayer()
-                        stopPlaying() // Opsional: Hentikan juga pemutaran saat login
+                        stopPlaying()
                     }
                     is AuthState.NotAuthenticated -> {
                         _isLoggedIn.value = false
-                        deactivateMiniPlayer() // Opsional: Matikan juga saat logout
-                        stopPlaying()       // Opsional: Hentikan juga pemutaran saat logout
+                        stopPlaying()
                     }
                     else -> {}
                 }
@@ -118,10 +230,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         private const val TAG = "MainViewModel"
+    }    fun playSong(song: Songs) {
+        Log.d(TAG, "Play song: ${song.name} using media controller")
+        
+        // Increment play count
+        viewModelScope.launch {
+            authRepository.currentUserId?.let { 
+                usersDao.incrementTotalPlayed(it)
+                Log.d(TAG, "Increment played: ${usersDao.getTotalPlayedById(it)}")
+            }
+        }
+        
+        if (serviceBound && mediaController != null) {
+            // Use the media controller if available
+            if (_currentSong.value != song) {
+                mediaController?.loadSong(song)
+            } else {
+                if (_isPlaying.value) {
+                    mediaController?.pause()
+                } else {
+                    mediaController?.play()
+                }
+            }
+        } else {
+            // Fallback to old implementation
+            Log.d(TAG, "Fallback to legacy media player")
+            legacyPlaySong(song)
+        }
     }
 
-    fun playSong(song: Songs) {
-        Log.d("IsPlayed Song", "Start${_isPlaying.value}")
+    private fun legacyPlaySong(song: Songs) {
         if (_currentSong.value != song) {
             mediaPlayer?.release()
             mediaPlayer = MediaPlayer().apply {
@@ -129,14 +267,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 prepare()
                 start()
                 _isPlaying.value = true
-                viewModelScope.launch {
-                    Log.d("Increment played: ", "${usersDao.getTotalPlayedById(authRepository.currentUserId)}")
-                    authRepository.currentUserId?.let { usersDao.incrementTotalPlayed(it) }
-                }
                 _currentSong.value = song
                 setOnCompletionListener {
                     _isPlaying.value = false
-                    updatePositionJob?.cancel()
                     deactivateMiniPlayer()
                     _currentSong.value = null
                 }
@@ -144,10 +277,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             updateCurrentPosition(song.id)
             activateMiniPlayer()
         } else {
-            Log.d("IsPlayed Song", "Lagi playing diklik${_isPlaying.value}")
             if (_isPlaying.value) {
                 mediaPlayer?.pause()
-                updatePositionJob?.cancel()
                 _isPlaying.value = false
             } else {
                 mediaPlayer?.start()
@@ -155,23 +286,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 updateCurrentPosition(song.id)
             }
         }
-    }
-
-    fun stopPlaying() {
-        mediaPlayer?.pause()
-        _isPlaying.value = false
-        updatePositionJob?.cancel()
-        deactivateMiniPlayer()
-        _currentSong.value = null
-    }
-
-    private fun updateCurrentPosition(songId: Int) {
+    }    fun stopPlaying() {
+        if (serviceBound && mediaController != null) {
+            mediaController?.stop()
+        } else {
+            // Fallback to old implementation
+            mediaPlayer?.pause()
+            _isPlaying.value = false
+            updatePositionJob?.cancel()
+            deactivateMiniPlayer()
+            _currentSong.value = null
+        }
+    }    private fun updateCurrentPosition(songId: Int) {
         updatePositionJob?.cancel()
         updatePositionJob = viewModelScope.launch {
             while (mediaPlayer != null && mediaPlayer?.isPlaying == true) {
                 val currentMediaPlayerPosition = mediaPlayer?.currentPosition ?: 0
-                if (currentSong.value?.id == songId && currentPosition.value != currentMediaPlayerPosition) {
-                    currentPosition.value = currentMediaPlayerPosition
+                if (currentSong.value?.id == songId && _currentPosition.value != currentMediaPlayerPosition) {
+                    _currentPosition.value = currentMediaPlayerPosition
                 }
                 delay(1000)
             }
@@ -184,15 +316,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isPlaying.value = false
         _currentSong.value = null
         deactivateMiniPlayer()
-    }
-
-    fun seekTo(position: Int) {
-        mediaPlayer?.seekTo(position)
-        currentPosition.value = position
+    }    fun seekTo(position: Int) {
+        if (serviceBound && mediaController != null) {
+            mediaController?.seekTo(position)
+        } else {
+            mediaPlayer?.seekTo(position)
+            _currentPosition.value = position
+        }
     }
 
     override fun onCleared() {
         super.onCleared()
+        if (serviceConnection != null) {
+            getApplication<Application>().applicationContext.unbindService(serviceConnection!!)
+        }
+        // Legacy cleanup
         releaseMediaPlayer()
+    }    private fun skipNext(songId: Int) {
+        if (skipToNextNavigationCallback != null) {
+            val isOnline = _isOnlineSong.value
+            val region = "GLOBAL" 
+            skipToNextNavigationCallback?.invoke(songId, isOnline, region) { nextSongId ->
+                Log.d(TAG, "Would navigate to next song: $nextSongId")
+            }
+        } else {
+            Log.d(TAG, "Skip to next requested but no navigation callback is registered")
+        }
+    }
+    
+    private fun skipPrevious(songId: Int) {
+        if (skipToPreviousNavigationCallback != null) {
+            val isOnline = _isOnlineSong.value
+            val region = "GLOBAL" 
+            skipToPreviousNavigationCallback?.invoke(songId, isOnline, region) { prevSongId ->
+                Log.d(TAG, "Would navigate to previous song: $prevSongId")
+            }
+        } else {
+            Log.d(TAG, "Skip to previous requested but no navigation callback is registered")
+        }
     }
 }
