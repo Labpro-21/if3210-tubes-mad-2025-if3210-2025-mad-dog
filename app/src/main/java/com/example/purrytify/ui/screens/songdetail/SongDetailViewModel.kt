@@ -126,7 +126,7 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
                             name = onlineSong.title,
                             artist = onlineSong.artist,
                             artwork = onlineSong.artwork,
-                            description = "",
+                            description = onlineSong.country,
                             filePath = onlineSong.url,
                             duration = parseDuration(onlineSong.duration),
                             isFavorite = false,

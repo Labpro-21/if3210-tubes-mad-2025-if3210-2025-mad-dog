@@ -92,7 +92,7 @@ fun AppNavigation(
                                     if (mainViewModel.currentSong.value != null) {
                                         val route = if (isOnlinePlaying) {
                                             Screen.SongDetailOnline.route
-                                                .replace("{region}", "GLOBAL") // You might need to determine the actual region
+                                                .replace("{region}", mainViewModel.currentSong.value!!.description)
                                                 .replace("{songId}", mainViewModel.currentSong.value!!.id.toString())
                                         } else {
                                             Screen.SongDetail.route.replace("{songId}", mainViewModel.currentSong.value!!.id.toString())
