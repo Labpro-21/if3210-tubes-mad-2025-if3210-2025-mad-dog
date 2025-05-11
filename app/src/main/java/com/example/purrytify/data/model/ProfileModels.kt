@@ -9,3 +9,9 @@ data class ProfileResponse(
     val createdAt: String,
     val updatedAt: String,
 )
+
+data class UpdateProfileResponse(
+    val success: Boolean,
+    val message: String,
+    val data: ProfileResponse?
+)
