@@ -116,8 +116,7 @@ fun EditProfileScreen(
         }
     }
     
-   nstead, we'll rely on the actual navigation argument passing when the user returns from the map screen
-    
+
     fun createImageUri(context: Context): Uri {
         val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
         val imageFileName = "JPEG_" + timeStamp + "_"

@@ -22,6 +22,7 @@ import com.example.purrytify.MainViewModel
 import com.example.purrytify.ui.components.BottomNavigationBar
 import com.example.purrytify.ui.components.LeftNavigationBar
 import com.example.purrytify.ui.components.MiniPlayer
+import com.example.purrytify.ui.screens.album.AlbumScreen
 import com.example.purrytify.ui.screens.home.HomeScreen
 import com.example.purrytify.ui.screens.library.LibraryScreen
 import com.example.purrytify.ui.screens.profile.EditProfileScreen
@@ -37,6 +38,8 @@ sealed class Screen(val route: String) {
     object Profile : Screen("profile")
     object Settings : Screen("settings")
     object SongDetail : Screen("songDetails/{songId}")
+    object SongDetailOnline : Screen("songDetails/online/{region}/{songId}")
+    object Album: Screen("album/{region}")
     object EditProfile : Screen("editProfile")
     object LocationPicker : Screen("locationPicker")
 }
@@ -50,12 +53,13 @@ fun AppNavigation(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: Screen.Home.route
     val isMiniPlayerActive by mainViewModel.isMiniPlayerActive.collectAsState()
-    val showMiniPlayer = (currentRoute == Screen.Home.route || currentRoute == Screen.Library.route) && isMiniPlayerActive
+    val showMiniPlayer = (currentRoute == Screen.Home.route || currentRoute == Screen.Library.route || currentRoute == Screen.Album.route ) && isMiniPlayerActive
+    val isOnlinePlaying by mainViewModel.isOnlineSong.collectAsState() // Get the isOnlinePlaying state
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val showNavigationBar = when (currentRoute) {
-        Screen.Home.route, Screen.Library.route, Screen.Profile.route, Screen.SongDetail.route -> true
+        Screen.Home.route, Screen.Library.route, Screen.Profile.route, Screen.SongDetail.route, Screen.SongDetailOnline.route, Screen.Album.route -> true
         else -> false
     }
 
@@ -79,19 +83,26 @@ fun AppNavigation(
         Scaffold(
             containerColor = SpotifyBlack,
             bottomBar = {
-                if (showNavigationBar && (isLandscape || !isLandscape)) { // Apply bottomBar logic in both orientations
+                if (showNavigationBar && (isLandscape || !isLandscape)) {
                     Column {
                         if (showMiniPlayer) {
                             MiniPlayer(
                                 mainViewModel = mainViewModel,
                                 onMiniPlayerClick = {
                                     if (mainViewModel.currentSong.value != null) {
-                                        navController.navigate("songDetails/${mainViewModel.currentSong.value!!.id}")
+                                        val route = if (isOnlinePlaying) {
+                                            Screen.SongDetailOnline.route
+                                                .replace("{region}", "GLOBAL") // You might need to determine the actual region
+                                                .replace("{songId}", mainViewModel.currentSong.value!!.id.toString())
+                                        } else {
+                                            Screen.SongDetail.route.replace("{songId}", mainViewModel.currentSong.value!!.id.toString())
+                                        }
+                                        navController.navigate(route)
                                     }
-                                }
+                                },
                             )
                         }
-                        if (!isLandscape) { // Show BottomNavigationBar only in portrait
+                        if (!isLandscape) {
                             BottomNavigationBar(
                                 currentRoute = currentRoute,
                                 onNavigate = { route ->
@@ -114,7 +125,7 @@ fun AppNavigation(
                 startDestination = Screen.Home.route,
                 modifier = Modifier
                     .padding(innerPadding)
-                    .padding(start = if (isLandscape && showNavigationBar) 8.dp else 0.dp) // Adjust content start padding
+                    .padding(start = if (isLandscape && showNavigationBar) 8.dp else 0.dp)
             ) {
                 composable(Screen.Home.route) {
                     HomeScreen(navController = navController, mainViewModel = mainViewModel)
@@ -188,6 +199,17 @@ fun AppNavigation(
                     )
                 }
                 composable(
+                    Screen.Album.route,
+                    arguments = listOf(navArgument("region") {type = NavType.StringType}))
+                {backStackEntry ->
+                    val region = backStackEntry.arguments?.getString("region")?:"GLOBAL"
+                    AlbumScreen(
+                        region = region,
+                        navController = navController,
+                        mainViewModel = mainViewModel,
+                    )
+                }
+                composable(
                     Screen.SongDetail.route,
                     arguments = listOf(navArgument("songId") { type = NavType.IntType })
                 ) { backStackEntry ->
@@ -195,7 +217,25 @@ fun AppNavigation(
                     SongDetailScreen(
                         songId = songId,
                         navController = navController,
-                        mainViewModel = mainViewModel
+                        mainViewModel = mainViewModel,
+                        isOnline = false
+                    )
+                }
+                composable(
+                    Screen.SongDetailOnline.route,
+                    arguments = listOf(
+                        navArgument("region") { type = NavType.StringType },
+                        navArgument("songId") { type = NavType.IntType }
+                    )
+                ) { backStackEntry ->
+                    val region = backStackEntry.arguments?.getString("region") ?: "GLOBAL"
+                    val songId = backStackEntry.arguments?.getInt("songId") ?: -1
+                    SongDetailScreen(
+                        songId = songId,
+                        navController = navController,
+                        mainViewModel = mainViewModel,
+                        isOnline = true,
+                        region = region
                     )
                 }
             }

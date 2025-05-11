@@ -1,12 +1,7 @@
-// SongDetailScreen.kt
-
 package com.example.purrytify.ui.screens.songdetail
 
 import android.content.Intent
-import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -22,6 +17,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
@@ -39,7 +36,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -48,61 +44,64 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import coil.compose.rememberAsyncImagePainter
-import coil.request.ImageRequest
-import com.example.purrytify.db.entity.Songs
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.palette.graphics.Palette
-import coil.imageLoader
+import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
 import com.example.purrytify.MainViewModel
-import com.example.purrytify.ui.theme.SpotifyBlack
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import com.example.purrytify.R
+import com.example.purrytify.db.entity.Songs
+import com.example.purrytify.ui.navigation.Screen
 import com.example.purrytify.ui.screens.library.UploadButton
+import com.example.purrytify.ui.theme.SpotifyBlack
+import com.example.purrytify.utils.ColorUtils
 import com.example.purrytify.utils.MediaUtils
+import kotlinx.coroutines.launch
 
 @Composable
 fun SongDetailScreen(
     songId: Int,
     viewModel: SongDetailViewModel = viewModel(),
     navController: NavController,
-    mainViewModel: MainViewModel
+    mainViewModel: MainViewModel,
+    isOnline: Boolean,
+    region: String = "GLOBAL",
 ) {
-    val uiState = viewModel.songDetails.collectAsState().value
+    val uiState by viewModel.songDetails.collectAsState()
     var showOptionsDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     val isUpdateSuccessful by viewModel.isUpdateSuccessful.collectAsState()
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
-    LaunchedEffect(songId) {
-        viewModel.loadSongDetails(songId)
+    LaunchedEffect(songId, isOnline, region) {
+        mainViewModel.setIsOnlineSong(isOnline)
+        viewModel.loadSongDetails(songId, isOnline = isOnline, region = region)
     }
     LaunchedEffect(isUpdateSuccessful) {
         if (isUpdateSuccessful) {
             mainViewModel.stopPlaying()
             Log.d("UpdatedSong: ", "Berhasil uppdate")
-            viewModel.resetUpdateSuccessful() // Reset state setelah digunakan
+            viewModel.resetUpdateSuccessful()
         }
     }
 
     when (uiState) {
-        SongDetailUiState.Loading -> {
+        SongDetailViewModel.SongDetailUiState.Loading -> {
             Text("Loading...", color = Color.White)
         }
-        is SongDetailUiState.Success -> {
+        is SongDetailViewModel.SongDetailUiState.Success -> {
             SongDetailsContent(
-                song = uiState.song,
+                song = (uiState as SongDetailViewModel.SongDetailUiState.Success).song,
                 navController = navController,
                 showBorder = false,
                 viewModel = viewModel,
                 onEditClick = { showEditDialog = true },
                 mainViewModel = mainViewModel,
-                isLandscape = isLandscape, // Pass the orientation state
-                onOptionClick = { showOptionsDialog = true }
+                isLandscape = isLandscape,
+                onOptionClick = { showOptionsDialog = true },
+                isOnline = isOnline,
+                currentRegion = region
             )
             if (showEditDialog) {
                 Dialog(
@@ -110,7 +109,7 @@ fun SongDetailScreen(
                     properties = DialogProperties(dismissOnClickOutside = false)
                 ) {
                     EditSongDialogContent(
-                        song = uiState.song,
+                        song = (uiState as SongDetailViewModel.SongDetailUiState.Success).song,
                         onDismiss = { showEditDialog = false },
                         viewModel = viewModel,
                         navController = navController,
@@ -125,19 +124,22 @@ fun SongDetailScreen(
                         showOptionsDialog = false
                     },
                     onDelete = {
-                        viewModel.deleteSong(uiState.song)
+                        viewModel.deleteSong((uiState as SongDetailViewModel.SongDetailUiState.Success).song)
                         mainViewModel.stopPlaying()
                         navController.popBackStack()
                         showOptionsDialog = false
                     },
-                    isLandscape = isLandscape // Pass the orientation state here
+                    isLandscape = isLandscape,
+                    isOnline = isOnline
                 )
             }
         }
-        is SongDetailUiState.Error -> {
-            Text(uiState.message, color = Color.Red)
+        is SongDetailViewModel.SongDetailUiState.Error -> {
+            Text((uiState as SongDetailViewModel.SongDetailUiState.Error).message, color = Color.Red)
         }
-        else -> {}
+        SongDetailViewModel.SongDetailUiState.Empty -> {
+            // Handle empty state if needed
+        }
     }
 }
 
@@ -146,7 +148,8 @@ fun OptionsDialog(
     onDismissRequest: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    isLandscape: Boolean // Receive orientation state
+    isLandscape: Boolean,
+    isOnline: Boolean
 ) {
     AlertDialog(
         onDismissRequest = onDismissRequest,
@@ -154,7 +157,7 @@ fun OptionsDialog(
         modifier = Modifier
             .run {
                 if (isLandscape) {
-                    width(IntrinsicSize.Min) // Don't fill width in landscape
+                    width(IntrinsicSize.Min)
                 } else {
                     fillMaxWidth()
                 }
@@ -165,26 +168,36 @@ fun OptionsDialog(
         title = { Text("Options", color = MaterialTheme.colorScheme.onSurfaceVariant) },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                OutlinedButton( // Use OutlinedButton for border
-                    onClick = onEdit,
-                    modifier = Modifier.fillMaxWidth(),
-                    border = BorderStroke(1.dp, Color.White),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.White)
-                ) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Edit", modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Edit")
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton( // Use OutlinedButton for border
-                    onClick = onDelete,
-                    modifier = Modifier.fillMaxWidth(),
-                    border = BorderStroke(1.dp, Color.White),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.White)
-                ) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete", modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Delete")
+                if (!isOnline) {
+                    OutlinedButton(
+                        onClick = onEdit,
+                        modifier = Modifier.fillMaxWidth(),
+                        border = BorderStroke(1.dp, Color.White),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Transparent,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Edit", modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Edit")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = onDelete,
+                        modifier = Modifier.fillMaxWidth(),
+                        border = BorderStroke(1.dp, Color.White),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Transparent,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Delete", modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Delete")
+                    }
+                } else {
+                    Text("No options available for online songs.", color = Color.Gray)
                 }
             }
         },
@@ -211,10 +224,11 @@ fun SongDetailsContent(
     viewModel: SongDetailViewModel,
     onEditClick: () -> Unit,
     mainViewModel: MainViewModel,
-    isLandscape: Boolean, // Receive the orientation state
-    onOptionClick: () -> Unit
+    isLandscape: Boolean,
+    onOptionClick: () -> Unit,
+    isOnline: Boolean,
+    currentRegion: String
 ) {
-    var dominantColor by remember { mutableStateOf(SpotifyBlack) }
     val currentPosition by mainViewModel.currentPosition.collectAsState()
     val isPlaying by mainViewModel.isPlaying.collectAsState()
     val currentSong by mainViewModel.currentSong.collectAsState()
@@ -229,58 +243,30 @@ fun SongDetailsContent(
             }
         }
     }
-    val artworkUri = song.artwork?.let { Uri.parse(it) }
 
+    val artworkUri = song.artwork?.let { Uri.parse(it) }
     val painter = rememberAsyncImagePainter(
         ImageRequest.Builder(context).data(data = artworkUri).apply {
             crossfade(true)
         }.build()
     )
-    LaunchedEffect(currentPosition) {
-        // Optional: Do something on position change
-    }
-
+    var dominantColor by remember { mutableStateOf<Brush>(Brush.verticalGradient(colors = listOf(SpotifyBlack, SpotifyBlack))) }
     LaunchedEffect(artworkUri) {
-        launch(Dispatchers.IO) {
-            val request = ImageRequest.Builder(context)
-                .data(artworkUri)
-                .allowHardware(false)
-                .build()
-
-            val result = context.imageLoader.execute(request)
-            val drawable = result.drawable
-            if (drawable is BitmapDrawable) {
-                val bitmap = drawable.bitmap
-                if (bitmap != null) {
-                    val palette = Palette.from(bitmap).generate()
-                    val color = palette.getVibrantColor(palette.getMutedColor(SpotifyBlack.toArgb()))
-                    withContext(Dispatchers.Main) {
-                        dominantColor = Color(color)
-                    }
-                }
-            }
+        launch {
+            dominantColor = ColorUtils.generateDominantColorGradient(context, artworkUri)
         }
     }
+
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colorStops = arrayOf(
-                        0.0f to dominantColor,
-                        0.1f to dominantColor,
-                        1.0f to SpotifyBlack
-                    )
-                )
-            )
+            .background(dominantColor)
             .padding(if (isLandscape) 8.dp else 16.dp)
     ) {
-        // Top Bar
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = if (isLandscape) 16.dp else 32.dp),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -291,17 +277,25 @@ fun SongDetailsContent(
                     .size(24.dp)
                     .clickable { navController.popBackStack() }
             )
-            Spacer(modifier = Modifier.weight(1f))
-            IconButton(onClick = onOptionClick) {
-                Icon(Icons.Filled.MoreVert, contentDescription = "Options", tint = Color.White)
+            Text(
+                text = if (isOnline) "Online Song" else "Offline Song",
+                color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
+            if (!isOnline) {
+                IconButton(onClick = onOptionClick) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = "Options", tint = Color.White)
+                }
+            } else {
+                Spacer(modifier = Modifier.size(24.dp)) // Use a fixed size
             }
         }
+        Spacer(modifier = Modifier.height(if (isLandscape) 16.dp else 32.dp))
 
-        // Scrollable Content Area
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState()), // Make this Column scrollable
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Image(
@@ -342,15 +336,19 @@ fun SongDetailsContent(
                     )
                 }
 
-                IconButton(onClick = {
-                    viewModel.toggleFavoriteStatus(song)
-                }) {
-                    Icon(
-                        imageVector = if (song.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                        contentDescription = "Favorite",
-                        tint = Color.White,
-                        modifier = Modifier.size(if (isLandscape) 36.dp else 48.dp)
-                    )
+                if (!isOnline) {
+                    IconButton(onClick = {
+                        viewModel.toggleFavoriteStatus(song)
+                    }) {
+                        Icon(
+                            imageVector = if (song.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                            contentDescription = "Favorite",
+                            tint = Color.White,
+                            modifier = Modifier.size(if (isLandscape) 36.dp else 48.dp)
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.size(24.dp)) // Use a fixed size
                 }
             }
 
@@ -373,8 +371,16 @@ fun SongDetailsContent(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(text = if (isSameSong) formatTime(currentPosition) else "00:00", color = Color.Gray, fontSize = if (isLandscape) 12.sp else 14.sp)
-                Text(text = formatTime(song.duration.toInt()), color = Color.Gray, fontSize = if (isLandscape) 12.sp else 14.sp)
+                Text(
+                    text = if (isSameSong) formatTime(currentPosition) else "00:00",
+                    color = Color.Gray,
+                    fontSize = if (isLandscape) 12.sp else 14.sp
+                )
+                Text(
+                    text = formatTime(song.duration.toInt()),
+                    color = Color.Gray,
+                    fontSize = if (isLandscape) 12.sp else 14.sp
+                )
             }
 
             Spacer(modifier = Modifier.height(if (isLandscape) 16.dp else 32.dp))
@@ -384,10 +390,19 @@ fun SongDetailsContent(
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
                 IconButton(onClick = {
-                    viewModel.skipPrevious(song.id) { previousSongId ->
-                        navController.navigate("songDetails/$previousSongId") {
-                            popUpTo("songDetails/{songId}") { inclusive = true }
-                            launchSingleTop = true
+                    if (!isOnline) {
+                        viewModel.skipPrevious(song.id, isOnline = false) { previousSongId ->
+                            navController.navigate(Screen.SongDetail.route.replace("{songId}", previousSongId.toString())) {
+                                popUpTo(Screen.SongDetail.route.replace("{songId}", song.id.toString())) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    } else {
+                        viewModel.skipPrevious(song.id, isOnline = true, currentRegion = currentRegion) { previousSongId ->
+                            navController.navigate(Screen.SongDetailOnline.route.replace("{region}", currentRegion).replace("{songId}", previousSongId.toString())) {
+                                popUpTo(Screen.SongDetailOnline.route.replace("{region}", currentRegion).replace("{songId}", song.id.toString())) { inclusive = true }
+                                launchSingleTop = true
+                            }
                         }
                     }
                 }) {
@@ -400,7 +415,7 @@ fun SongDetailsContent(
                 }
                 IconButton(onClick = {
                     mainViewModel.playSong(song)
-                    viewModel.insertRecentlyPlayed(song.id)
+                    viewModel.insertRecentlyPlayed(song.id, if (isOnline) true else false)
                 }) {
                     Icon(
                         imageVector = if (isPlaying && isSameSong) Icons.Filled.Pause else Icons.Filled.PlayArrow,
@@ -410,10 +425,19 @@ fun SongDetailsContent(
                     )
                 }
                 IconButton(onClick = {
-                    viewModel.skipNext(song.id) { nextSongId ->
-                        navController.navigate("songDetails/$nextSongId") {
-                            popUpTo("songDetails/{songId}") { inclusive = true }
-                            launchSingleTop = true
+                    if (!isOnline) {
+                        viewModel.skipNext(song.id, isOnline = false) { nextSongId ->
+                            navController.navigate(Screen.SongDetail.route.replace("{songId}", nextSongId.toString())) {
+                                popUpTo(Screen.SongDetail.route.replace("{songId}", song.id.toString())) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    } else {
+                        viewModel.skipNext(song.id, isOnline = true, currentRegion = currentRegion) { nextSongId ->
+                            navController.navigate(Screen.SongDetailOnline.route.replace("{region}", currentRegion).replace("{songId}", nextSongId.toString())) {
+                                popUpTo(Screen.SongDetailOnline.route.replace("{region}", currentRegion).replace("{songId}", song.id.toString())) { inclusive = true }
+                                launchSingleTop = true
+                            }
                         }
                     }
                 }) {
@@ -428,9 +452,6 @@ fun SongDetailsContent(
         }
     }
 }
-
-
-
 
 @Composable
 fun EditSongDialogContent(

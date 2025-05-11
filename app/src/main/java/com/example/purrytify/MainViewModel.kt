@@ -22,6 +22,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isLoggedIn = MutableStateFlow(false)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn
 
+    private val _isOnlineSong = MutableStateFlow(false)
+    val isOnlineSong: StateFlow<Boolean> = _isOnlineSong
+
     private val usersDao = AppDatabase.getDatabase(application).usersDao()
 
     private val _currentSong = MutableStateFlow<Songs?>(null)
@@ -29,6 +32,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying
+
+
 
     private val _isMiniPlayerActive = MutableStateFlow(false)
     val isMiniPlayerActive: StateFlow<Boolean> = _isMiniPlayerActive
@@ -51,6 +56,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _isMiniPlayerActive.value = false
     }
 
+    fun setIsOnlineSong(isOnline: Boolean) {
+        _isOnlineSong.value = isOnline
+    }
     private fun checkLoginStatus() {
         viewModelScope.launch {
             try {
