@@ -53,7 +53,8 @@ import com.example.purrytify.ui.theme.SpotifyGreen
 @Composable
 fun ProfileScreen(
     viewModel: ProfileViewModel = viewModel(),
-    onNavigateToSettings: () -> Unit = {}
+    onNavigateToSettings: () -> Unit = {},
+    onNavigateToEditProfile: () -> Unit = {}
 ) {
     val profile by viewModel.profile.collectAsState()
     val songsCount by viewModel.songsCount.collectAsState()
@@ -66,12 +67,14 @@ fun ProfileScreen(
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val scrollState = rememberScrollState()
 
+    // Fetch profile data when first loaded and when returning to this screen
     LaunchedEffect(Unit) {
         viewModel.getProfile()
         viewModel.getSongsCount()
         viewModel.getFavoriteSongsCount()
         viewModel.getTotalListenedCount()
     }
+
     LaunchedEffect(profile) {
         println("Profile Photo: ${profile?.profilePhoto}")
     }
@@ -163,11 +166,10 @@ fun ProfileScreen(
                     fontSize = 14.sp,
                     color = Color.LightGray
                 )
-
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Button(
-                    onClick = { },
+                    onClick = { onNavigateToEditProfile() },
                     colors = ButtonDefaults.buttonColors(Color.DarkGray)
                 ) {
                     Text("Edit Profile", color = Color.White)
