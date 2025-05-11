@@ -21,8 +21,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import com.example.purrytify.ui.screens.songdetail.SongDetailViewModel
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
+
+    private var songDetailViewModel: SongDetailViewModel? = null
 
     private val authRepository = AuthRepository.getInstance(application)
 
@@ -76,6 +79,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             Log.d("MainViewModel", "Service connected")
             val binder = service as? MusicPlayerService.LocalBinder
             musicService = binder?.service
+            // Set view models in the service
+            songDetailViewModel?.let { musicService?.setViewModels(this@MainViewModel, it) }
             currentSong.value?.let { song ->
                 Log.d("MainViewModel", "Updating notification with current song: ${song.name}")
                 musicService?.updateNotification(song, isPlaying.value)
@@ -175,7 +180,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             Log.d("MainViewModel", "Updating notification for new song: ${song.name}")
             musicService?.updateNotification(song, true)
         } else {
-            Log.d("IsPlayed Song", "Lagi playing diklik${_isPlaying.value}")
+            Log.d("MainViewModel", "Toggle playback for current song: ${song.name}, isPlaying: ${_isPlaying.value}")
             if (_isPlaying.value) {
                 mediaPlayer?.pause()
                 updatePositionJob?.cancel()
@@ -200,20 +205,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _currentSong.value = null
         musicService?.updateNotification(null, false)
 
-    }
-
-    private fun updateCurrentPosition(songId: Int) {
+    }    private fun updateCurrentPosition(songId: Int) {
         updatePositionJob?.cancel()
         updatePositionJob = viewModelScope.launch {
+            var lastNotificationUpdateTime = 0L
             while (mediaPlayer != null && mediaPlayer?.isPlaying == true) {
                 val currentMediaPlayerPosition = mediaPlayer?.currentPosition ?: 0
                 if (currentSong.value?.id == songId && currentPosition.value != currentMediaPlayerPosition) {
                     currentPosition.value = currentMediaPlayerPosition
+                    
+                    // Only update notification every 1 second to avoid excessive updates
+                    val currentTime = System.currentTimeMillis()
+                    if (currentTime - lastNotificationUpdateTime > 1000) {
+                        currentSong.value?.let { song ->
+                            musicService?.updateNotification(song, true)
+                        }
+                        lastNotificationUpdateTime = currentTime
+                    }
                 }
-                delay(1000)
+                delay(500) // Keep the frequent position updates for UI
             }
         }
     }
+
 
     private fun releaseMediaPlayer() {
         mediaPlayer?.release()
@@ -235,6 +249,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             Log.d("MainViewModel", "Service binding result: $bound")
         } catch (e: Exception) {
             Log.e("MainViewModel", "Error binding service", e)
+        }
+    }    fun playSongById(songId: Int) {
+        viewModelScope.launch {
+            try {
+                val song = AppDatabase.getDatabase(getApplication()).songsDao().getSongById(songId)
+                song?.let {
+                    Log.d("MainViewModel", "Playing song by ID: $songId, ${it.name}")
+                    playSong(it)
+                } ?: Log.e("MainViewModel", "Song with ID $songId not found")
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Error playing song by ID: $songId", e)
+            }
+        }
+    }
+
+    fun pauseSong() {
+        if (_isPlaying.value) {
+            mediaPlayer?.pause()
+            _isPlaying.value = false
+            updatePositionJob?.cancel()
+            
+            // Update notification with paused state
+            _currentSong.value?.let { song ->
+                musicService?.updateNotification(song, false)
+            }
+        }
+    }
+    
+    fun resumeSong() {
+        if (!_isPlaying.value && _currentSong.value != null) {
+            mediaPlayer?.start()
+            _isPlaying.value = true
+            _currentSong.value?.let { song ->
+                updateCurrentPosition(song.id)
+                // Update notification with playing state
+                musicService?.updateNotification(song, true)
+            }
         }
     }
 

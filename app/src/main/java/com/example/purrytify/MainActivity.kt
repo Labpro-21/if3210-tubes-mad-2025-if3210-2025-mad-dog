@@ -2,6 +2,7 @@ package com.example.purrytify
 
 import android.content.pm.PackageManager
 import android.Manifest
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -33,15 +34,19 @@ import com.example.purrytify.ui.theme.PurrytifyTheme
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
-
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         NetworkMonitor.initialize(applicationContext)
         checkNotificationPermission()
-        viewModel.bindMusicService(this)
+        
+        // Start and bind the music service
         viewModel.startMusicService(this)
+        viewModel.bindMusicService(this)
+        
+        // Handle intent
+        handleIntent(intent)
 
         setContent {
             PurrytifyTheme {
@@ -53,6 +58,16 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+    
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+    
+    private fun handleIntent(intent: Intent?) {
+        // Handle any media-related intents if needed
+        Log.d("MainActivity", "Handling intent: ${intent?.action}")
     }
 
     override fun onDestroy() {
