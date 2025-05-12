@@ -7,11 +7,13 @@ import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.purrytify.data.auth.AuthRepository
-import com.example.purrytify.data.auth.OnlineSongRepository
+import com.example.purrytify.data.repository.OnlineSongRepository
 import com.example.purrytify.db.AppDatabase
 import com.example.purrytify.db.entity.RecentlyPlayed
 import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.data.model.OnlineSongResponse
+import com.example.purrytify.data.repository.ListeningActivityRepository
+import com.example.purrytify.db.entity.ListeningActivity
 import com.example.purrytify.utils.DownloadUtils
 import com.example.purrytify.utils.MediaUtils
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,8 +21,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.text.ParseException
-import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
@@ -29,42 +29,29 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
     private val songDao = AppDatabase.getDatabase(application).songsDao()
     private val context = application.applicationContext
     private val recentlyPlayedDao = AppDatabase.getDatabase(application).recentlyPlayedDao()
+    private val listenActivityDao = AppDatabase.getDatabase(application).listeningCapsuleDao()
+    private val listenActivityRepository = ListeningActivityRepository.getInstance(listenActivityDao)
     private val authRepository = AuthRepository.getInstance(application)
     private val onlineSongRepository = OnlineSongRepository.getInstance(application)
-
     private val _isUpdateSuccessful = MutableStateFlow(false)
     val isUpdateSuccessful: StateFlow<Boolean> = _isUpdateSuccessful
-
     private val _songDetails = MutableStateFlow<SongDetailUiState>(SongDetailUiState.Loading)
     val songDetails: StateFlow<SongDetailUiState> = _songDetails
-
     private val _userSongIds = MutableStateFlow<List<Int>>(emptyList())
-    val userSongIds: StateFlow<List<Int>> = _userSongIds
-
     private val _onlineSongs = MutableStateFlow<List<OnlineSongResponse>>(emptyList())
-    val onlineSongs: StateFlow<List<OnlineSongResponse>> = _onlineSongs
+    private val _isOnline = MutableStateFlow<Boolean>(false)
     private val tag = "SongDetailViewModel"
     private val _currentOnlineSongId = MutableStateFlow<Int?>(null)
-    val currentOnlineSongId: StateFlow<Int?> = _currentOnlineSongId
-
     private val _currentOnlineRegion = MutableStateFlow<String>("GLOBAL")
-    val currentOnlineRegion: StateFlow<String> = _currentOnlineRegion
-
-    // Add state for tracking if the current song is already downloaded
     private val _isAlreadyDownloaded = MutableStateFlow(false)
     val isAlreadyDownloaded: StateFlow<Boolean> = _isAlreadyDownloaded
-
-    // Add state for tracking if a download is in progress
     private val _isDownloading = MutableStateFlow(false)
     val isDownloading: StateFlow<Boolean> = _isDownloading
+    private val _currentListeningActivityId = MutableStateFlow<Long?>(null) // To track the current listening activity
 
-    init {
-        loadUserSongIds()
-    }
     private fun setCurrentOnlineSongId(songId: Int?) {
         _currentOnlineSongId.value = songId
         Log.d(tag, "Current online song ID updated to: $songId")
-        // Check if this song is already downloaded when ID changes
         songId?.let { checkIfAlreadyDownloaded(it) }
     }
 
@@ -73,7 +60,7 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
         Log.d(tag, "Current online region updated to: $region")
     }
 
-    fun getCurrentOnlineSong(): OnlineSongResponse? {
+    private fun getCurrentOnlineSong(): OnlineSongResponse? {
         val currentId = _currentOnlineSongId.value
         return if (currentId != null) {
             _onlineSongs.value.find { it.id == currentId }
@@ -132,22 +119,60 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
             false
         }
     }
+    fun insertListeningActivity(song: Songs, isOnline: Boolean = false) {
+        Log.d(tag,"InsertListeningActivity: isOnline: $isOnline")
+        if (!isOnline) {
+            viewModelScope.launch {
+                val userId = authRepository.currentUserId
 
-    fun loadOnlineSongs() {
+                if (userId != null) {
+                    try {
+                        val listeningActivity = ListeningActivity(
+                            userId = userId,
+                            songId = song.id,
+                            startTime = Date(),
+                            endTime = null // Set to null initially as the song is still playing
+                        )
+                        val insertedId = listenActivityRepository.insert(listeningActivity)
+                        _currentListeningActivityId.value = insertedId // Track the ID of the current listening activity
+                        Log.d(tag, "Listening activity started: $listeningActivity, ID: $insertedId")
+                    } catch (e: Exception) {
+                        Log.e(tag, "Error inserting listening activity: ${e.message}")
+                        Toast.makeText(context, "Error saving listening activity", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    Log.e(tag, "User ID is null, cannot insert listening activity")
+                    Toast.makeText(context, "User not logged in", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+    fun updateCompletedAndDuration() {
         viewModelScope.launch {
-            loadOnlineSongsSync()
+            try {
+                val existingActivity = listenActivityDao.getById(_currentListeningActivityId.value!!.toInt()) // Assuming ID is Int in DAO
+                existingActivity?.let {
+                    val endTime = Date()
+                    val actualDuration = endTime.time - it.startTime.time // Calculate actual duration
+
+                    val updatedActivity = it.copy(
+                        endTime = endTime,
+                        duration = actualDuration,
+                        completed = true
+                    )
+                    listenActivityRepository.update(updatedActivity)
+                    Log.d(tag, "Listening activity completed. ID: ${_currentListeningActivityId.value}, Duration: $actualDuration ms")
+                    _currentListeningActivityId.value = null // Reset the current listening activity ID
+                } ?: run {
+                    Log.w(tag, "Listening activity with ID ${_currentListeningActivityId.value} not found for update.")
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "Error updating listening activity: ${e.message}")
+                Toast.makeText(context, "Error updating listening history", Toast.LENGTH_SHORT).show()
+            }
         }
     }
-    fun getOnlineSongById(songId: Int, region: String = "GLOBAL"): OnlineSongResponse? {
-        Log.d(tag, "getOnlineSongById: Searching for song with ID $songId in region $region")
-        if (_onlineSongs.value.isEmpty()) {
-            Log.w(tag, "getOnlineSongById: Online songs list is empty. Consider calling loadOnlineSongs() first.")
-            return null
-        }
-        val foundSong = _onlineSongs.value.find { it.id == songId }
-        Log.d(tag, "getOnlineSongById: Found song: $foundSong")
-        return foundSong
-    }
+
     fun loadSongDetails(songId: Int, isOnline: Boolean = false, region: String = "GLOBAL") {
         viewModelScope.launch {
             _songDetails.value = SongDetailUiState.Loading // Set loading state
@@ -170,7 +195,7 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
                     }
 
                     val onlineSong = _onlineSongs.value.find { it.id == songId }
-                    Log.d(tag, "Album Region: ${region}")
+                    Log.d(tag, "Album Region: $region")
                     Log.d(tag, "Online songs count: ${_onlineSongs.value.size}")
                     Log.d(tag, "Looking for song ID: $songId")
                     Log.d(tag, "Found online song: $onlineSong")
@@ -200,6 +225,7 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
                     }
                 } else {
                     // Fetch from local database
+                    loadUserSongIds()
                     val song = songDao.getSongById(songId)
                     if (song != null) {
                         _songDetails.value = SongDetailUiState.Success(song)
@@ -214,7 +240,7 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun insertRecentlyPlayed(songId: Int, isOnline: Boolean = false) {
+    fun insertRecentlyPlayed(song: Songs, isOnline: Boolean = false) {
         if (!isOnline) {
             viewModelScope.launch {
                 val userId = authRepository.currentUserId
@@ -223,7 +249,7 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
                     try {
                         val recentlyPlayed = RecentlyPlayed(
                             userId = userId,
-                            songId = songId,
+                            songId = song.id,
                             playedAt = Date()
                         )
                         recentlyPlayedDao.insertRecentlyPlayed(recentlyPlayed)
@@ -236,6 +262,9 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
                     Log.e(tag, "User ID is null, cannot insert recently played")
                     Toast.makeText(context, "User not logged in", Toast.LENGTH_SHORT).show()
                 }
+
+
+
             }
         }
     }
@@ -439,6 +468,10 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
             Log.e(TAG, "Failed to download or insert song: ${song.title}")
             throw Exception("Failed to download song")
         }
+    }
+
+    fun setOnline(online: Boolean) {
+        _isOnline.value = online
     }
 
     companion object {

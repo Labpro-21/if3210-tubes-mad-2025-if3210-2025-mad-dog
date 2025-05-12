@@ -1,5 +1,6 @@
 package com.example.purrytify.ui.screens.songdetail
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
@@ -51,7 +52,6 @@ import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import com.example.purrytify.MainViewModel
 import com.example.purrytify.R
-import com.example.purrytify.data.model.OnlineSongResponse
 import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.ui.navigation.Screen
 import com.example.purrytify.ui.screens.library.UploadButton
@@ -70,13 +70,26 @@ fun SongDetailScreen(
     region: String = "GLOBAL",
 ) {
     val uiState by viewModel.songDetails.collectAsState()
+    //val playbackCompletedState by mainViewModel.isPlaybackCompleted.collectAsState()
 
     var showOptionsDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     val isUpdateSuccessful by viewModel.isUpdateSuccessful.collectAsState()
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    viewModel.setOnline(isOnline)
 
+    /*
+    LaunchedEffect(playbackCompletedState) {
+        if (playbackCompletedState) {
+            Log.d("SongDetailScreen", "Playback completed for song ID: $songId")
+            viewModel.updateCompletedAndDuration()
+
+        } else {
+            Log.d("SongDetailScreen", "Playback is active or not completed for song ID: $songId")
+        }
+    }
+*/
     LaunchedEffect(songId, isOnline, region) {
         mainViewModel.setIsOnlineSong(isOnline)
         viewModel.loadSongDetails(songId, isOnline = isOnline, region = region)
@@ -212,6 +225,7 @@ fun OptionsDialog(
     )
 }
 
+@SuppressLint("DefaultLocale")
 fun formatTime(millis: Int): String {
     val totalSeconds = millis / 1000
     val minutes = totalSeconds / 60
@@ -455,7 +469,8 @@ fun SongDetailsContent(
                 }
                 IconButton(onClick = {
                     mainViewModel.playSong(song)
-                    viewModel.insertRecentlyPlayed(song.id, if (isOnline) true else false)
+                    viewModel.insertRecentlyPlayed(song, isOnline)
+                    viewModel.insertListeningActivity(song,isOnline)
                 }) {
                     Icon(
                         imageVector = if (isPlaying && isSameSong) Icons.Filled.Pause else Icons.Filled.PlayArrow,

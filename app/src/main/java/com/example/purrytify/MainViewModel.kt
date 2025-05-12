@@ -50,7 +50,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // For backward compatibility
     private var mediaPlayer: MediaPlayer? = null
-    
+
     // Service connection
     private var mediaController: MediaPlayerController? = null
     private var serviceConnection: ServiceConnection? = null
@@ -60,32 +60,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Navigation callbacks for media controller
     private var skipToNextNavigationCallback: ((Int, Boolean, String, (Int) -> Unit) -> Unit)? = null
     private var skipToPreviousNavigationCallback: ((Int, Boolean, String, (Int) -> Unit) -> Unit)? = null
-    
+
     fun registerNavigationCallbacks(
         skipToNext: (Int, Boolean, String, (Int) -> Unit) -> Unit,
         skipToPrevious: (Int, Boolean, String, (Int) -> Unit) -> Unit
     ) {
         skipToNextNavigationCallback = skipToNext
         skipToPreviousNavigationCallback = skipToPrevious
-        
+
         updateMediaControllerCallbacks()
     }
-    
+
     private fun updateMediaControllerCallbacks() {
         if (serviceBound && mediaController != null) {
             mediaController?.skipToNextCallback = { songId ->
                 Log.d(TAG, "MediaController requesting skip to next for song: $songId")
                 val isOnline = _isOnlineSong.value
-                val region = "GLOBAL" 
+                val region = "GLOBAL"
                 skipToNextNavigationCallback?.invoke(songId, isOnline, region) { nextSongId ->
                     Log.d(TAG, "Would navigate to next song: $nextSongId")
                 }
             }
-            
+
             mediaController?.skipToPreviousCallback = { songId ->
                 Log.d(TAG, "MediaController requesting skip to previous for song: $songId")
                 val isOnline = _isOnlineSong.value
-                val region = "GLOBAL" 
+                val region = "GLOBAL"
                 skipToPreviousNavigationCallback?.invoke(songId, isOnline, region) { prevSongId ->
                     Log.d(TAG, "Would navigate to previous song: $prevSongId")
                 }
@@ -97,30 +97,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         checkLoginStatus()
         observeAuthState()
         bindMediaService()
-    }    private fun bindMediaService() {
+    }
+    private fun bindMediaService() {
         val context = getApplication<Application>().applicationContext
         val serviceIntent = Intent(context, MediaPlaybackService::class.java)
-        
+
         serviceConnection = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
                 val binder = service as MediaPlaybackService.LocalBinder
                 mediaController = binder.getMediaController()
                 serviceBound = true
-                
+
                 // Setup callbacks
                 mediaController?.setCallbacks(
                     onSkipToNext = { songId -> skipNext(songId) },
                     onSkipToPrevious = { songId -> skipPrevious(songId) },
                     onPlaybackFinished = {
                         _isPlaying.value = false
-                        _isMiniPlayerActive.value = false
-                        _currentSong.value = null
+                        // Don't reset the current song here - we still want to show it in mini player
+                        // _currentSong.value = null
+
+                        // Instead, just reset the position and keep mini player active
+                        _currentPosition.value = 0
+
+                        // Mini player should remain active to show the completed song
+                        //_isMiniPlayerActive.value = false
                     }
                 )
-                
+
                 // Update navigation callbacks if they're already registered
                 updateMediaControllerCallbacks()
-                
+
                 // Observe controller states
                 observeMediaControllerStates()
             }
@@ -130,41 +137,52 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 serviceBound = false
             }
         }
-        
+
         // Start and bind the service
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(serviceIntent)
         } else {
             context.startService(serviceIntent)
         }
-        
+
         context.bindService(serviceIntent, serviceConnection!!, Context.BIND_AUTO_CREATE)
     }
-    
+
     private fun observeMediaControllerStates() {
         viewModelScope.launch {
             mediaController?.isPlaying?.collectLatest { isPlaying ->
                 _isPlaying.value = isPlaying
+                // If not playing but we have a current song, ensure mini player is still active
+                if (!isPlaying && _currentSong.value != null) {
+                    _isMiniPlayerActive.value = true
+                }
             }
         }
-        
+
         viewModelScope.launch {
             mediaController?.currentSong?.collectLatest { song ->
                 if (song != null) {
+                    // When song changes, ensure the position also resets in UI
+                    if (_currentSong.value?.id != song.id) {
+                        _currentPosition.value = 0
+                    }
                     _currentSong.value = song
                     _isMiniPlayerActive.value = true
                 } else {
                     _isMiniPlayerActive.value = false
+                    _currentPosition.value = 0
                 }
             }
         }
-        
+
         viewModelScope.launch {
             mediaController?.currentPosition?.collectLatest { position ->
                 _currentPosition.value = position
             }
         }
-    }    private fun activateMiniPlayer() {
+    }
+
+    private fun activateMiniPlayer() {
         _isMiniPlayerActive.value = true
     }
 
@@ -230,25 +248,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         private const val TAG = "MainViewModel"
-    }    fun playSong(song: Songs) {
+    }
+    fun playSong(song: Songs) {
         Log.d(TAG, "Play song: ${song.name} using media controller")
-        
+
         // Increment play count
         viewModelScope.launch {
-            authRepository.currentUserId?.let { 
+            authRepository.currentUserId?.let {
                 usersDao.incrementTotalPlayed(it)
                 Log.d(TAG, "Increment played: ${usersDao.getTotalPlayedById(it)}")
             }
         }
-        
+
         if (serviceBound && mediaController != null) {
             // Use the media controller if available
-            if (_currentSong.value != song) {
+            if (_currentSong.value?.id != song.id) {
+                // Different song, load it
                 mediaController?.loadSong(song)
             } else {
+                // Same song, toggle play/pause
                 if (_isPlaying.value) {
                     mediaController?.pause()
                 } else {
+                    // If it's the same song but not playing, we might need to check position
+                    if (_currentPosition.value >= (mediaController?.getDuration() ?: 0) - 1000) {
+                        // We're at the end, restart
+                        mediaController?.seekTo(0)
+                    }
                     mediaController?.play()
                 }
             }
@@ -258,6 +284,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             legacyPlaySong(song)
         }
     }
+
 
     private fun legacyPlaySong(song: Songs) {
         if (_currentSong.value != song) {
@@ -335,7 +362,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }    private fun skipNext(songId: Int) {
         if (skipToNextNavigationCallback != null) {
             val isOnline = _isOnlineSong.value
-            val region = "GLOBAL" 
+            val region = "GLOBAL"
             skipToNextNavigationCallback?.invoke(songId, isOnline, region) { nextSongId ->
                 Log.d(TAG, "Would navigate to next song: $nextSongId")
             }
@@ -343,11 +370,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             Log.d(TAG, "Skip to next requested but no navigation callback is registered")
         }
     }
-    
+
     private fun skipPrevious(songId: Int) {
         if (skipToPreviousNavigationCallback != null) {
             val isOnline = _isOnlineSong.value
-            val region = "GLOBAL" 
+            val region = "GLOBAL"
             skipToPreviousNavigationCallback?.invoke(songId, isOnline, region) { prevSongId ->
                 Log.d(TAG, "Would navigate to previous song: $prevSongId")
             }

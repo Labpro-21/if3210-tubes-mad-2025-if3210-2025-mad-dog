@@ -94,7 +94,31 @@ class MediaPlayerController private constructor(private val context: Context) { 
 
         mediaPlayer.setOnCompletionListener {
             _isPlaying.value = false
+            Log.d(TAG,"Lagu selesai")
+            // Reset position to 0 when song completes
+            _currentPosition.value = 0
             updatePositionJob?.cancel()
+
+            // Update media session playback state to stopped
+            val playbackState = PlaybackStateCompat.Builder()
+                .setState(
+                    PlaybackStateCompat.STATE_STOPPED,
+                    0,
+                    0f
+                )
+                .setActions(
+                    PlaybackStateCompat.ACTION_PLAY_PAUSE or
+                            PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+                            PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+                )
+                .build()
+
+            mediaSession.setPlaybackState(playbackState)
+
+            // Update notification to reflect stopped state
+            updateNotification()
+
+            // Then invoke callback
             playbackFinishedCallback?.invoke()
         }
 
@@ -102,6 +126,7 @@ class MediaPlayerController private constructor(private val context: Context) { 
             play()
         }
     }
+
 
     private fun setupMediaSession() {
         mediaSession = MediaSessionCompat(context, "PurrytifyMediaSession")
@@ -192,6 +217,12 @@ class MediaPlayerController private constructor(private val context: Context) { 
 
     fun loadSong(song: Songs) {
         try {
+            // Reset position first
+            _currentPosition.value = 0
+
+            // Cancel any ongoing position updates
+            updatePositionJob?.cancel()
+
             mediaPlayer.reset()
             mediaPlayer.setDataSource(context, Uri.parse(song.filePath))
             mediaPlayer.prepareAsync()

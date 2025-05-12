@@ -5,18 +5,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.purrytify.data.auth.AuthRepository
-import com.example.purrytify.data.auth.OnlineSongRepository
+import com.example.purrytify.data.repository.OnlineSongRepository
 import com.example.purrytify.data.model.OnlineSongResponse
 import com.example.purrytify.db.AppDatabase // Assuming this is your Room database class
-import com.example.purrytify.db.entity.Songs
-import com.example.purrytify.utils.DateConverter
 import com.example.purrytify.utils.DownloadUtils
-import com.example.purrytify.utils.MediaUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import java.io.File
-import java.util.Date
 import java.util.Locale
 
 class AlbumViewModel(application: Application) : AndroidViewModel(application) {
