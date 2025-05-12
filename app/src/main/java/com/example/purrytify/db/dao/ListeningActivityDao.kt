@@ -7,6 +7,8 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import com.example.purrytify.db.entity.ListeningActivity
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 @Dao
 interface ListeningActivityDao {
@@ -137,7 +139,7 @@ interface ListeningActivityDao {
         return maxStreak
     }
 
-    // Updated function to get all Sound Capsule data with complete song information
+    // Updated function to get all Sound Capsule data with complete song information and month-year
     @Transaction
     fun getSoundCapsuleData(userId: Int): SoundCapsule {
         val totalTime = getTotalListeningTimeThisMonth(userId)
@@ -145,19 +147,23 @@ interface ListeningActivityDao {
         val topSongResult = getTopSongThisMonth(userId)
         val dayStreak = calculateDayStreak(userId)
 
+        val currentMonthYear = LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM yyyy"))
+
         return SoundCapsule(
             totalTimeListened = totalTime,
             topArtist = topArtistResult?.artist,
             topSong = topSongResult, // Now passing the entire TopSongComplete object
-            listeningDayStreak = dayStreak
+            listeningDayStreak = dayStreak,
+            monthYear = currentMonthYear // Added month and year information
         )
     }
 
-    // Updated data class for Sound Capsule with complete song information
+    // Updated data class for Sound Capsule with complete song information and month-year
     data class SoundCapsule(
         val totalTimeListened: Long,
         val topArtist: String?,
         val topSong: TopSongComplete?, // Changed from String? to TopSongComplete?
-        val listeningDayStreak: Int
+        val listeningDayStreak: Int,
+        val monthYear: String // Added property for month and year
     )
 }
