@@ -48,6 +48,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentPosition = MutableStateFlow(0)
     val currentPosition: StateFlow<Int> = _currentPosition
 
+    private val _songFinished = MutableStateFlow(false)
+    val songFinished: StateFlow<Boolean> = _songFinished
+
     // For backward compatibility
     private var mediaPlayer: MediaPlayer? = null
 
@@ -108,6 +111,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 mediaController = binder.getMediaController()
                 serviceBound = true
 
+                mediaController?.setIsOnlineSong(_isOnlineSong.value)
+
                 // Setup callbacks
                 mediaController?.setCallbacks(
                     onSkipToNext = { songId -> skipNext(songId) },
@@ -116,7 +121,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         _isPlaying.value = false
                         // Don't reset the current song here - we still want to show it in mini player
                         // _currentSong.value = null
-
+                        _songFinished.value = true // Set songFinished to true
                         // Instead, just reset the position and keep mini player active
                         _currentPosition.value = 0
 
@@ -192,7 +197,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setIsOnlineSong(isOnline: Boolean) {
         _isOnlineSong.value = isOnline
-    }    private fun checkLoginStatus() {
+        if (serviceBound && mediaController != null) {
+            mediaController?.setIsOnlineSong(isOnline)
+        }
+    }
+
+
+    private fun checkLoginStatus() {
         viewModelScope.launch {
             try {
                 val loggedIn = authRepository.isLoggedIn()
@@ -234,14 +245,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 authRepository.logout()
                 Log.d(TAG, "Logout completed, isLoggedIn = ${_isLoggedIn.value}")
-                // Status NotAuthenticated akan di-emit oleh authRepository,
-                // dan logika di observeAuthState akan menangani deaktivasi miniplayer.
+                // The observeAuthState will handle setting _isLoggedIn to false.
+                // We now explicitly handle media cleanup here.
+                stopPlaying()
+                deactivateMiniPlayer()
+                // No need to manually set _currentSong to null here,
+                // stopPlaying() should handle it.
+
             } catch (e: Exception) {
                 Log.e(TAG, "Error during logout: ${e.message}")
-                // Force Logout
+                // Force Logout and ensure media is cleaned up even on error
                 _isLoggedIn.value = false
-                deactivateMiniPlayer()
                 stopPlaying()
+                deactivateMiniPlayer()
             }
         }
     }
@@ -252,20 +268,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun playSong(song: Songs) {
         Log.d(TAG, "Play song: ${song.name} using media controller")
 
-        // Increment play count
-        viewModelScope.launch {
-            authRepository.currentUserId?.let {
-                usersDao.incrementTotalPlayed(it)
-                Log.d(TAG, "Increment played: ${usersDao.getTotalPlayedById(it)}")
-            }
-        }
 
         if (serviceBound && mediaController != null) {
+            mediaController?.setIsOnlineSong(_isOnlineSong.value)
             // Use the media controller if available
             if (_currentSong.value?.id != song.id) {
                 // Different song, load it
                 mediaController?.loadSong(song)
+                //increment
+                viewModelScope.launch {
+                    authRepository.currentUserId?.let {
+                        usersDao.incrementTotalPlayed(it)
+                        Log.d(TAG, "Increment played: ${usersDao.getTotalPlayedById(it)}")
+                    }
+                }
             } else {
+                if(_songFinished.value){
+                    _songFinished.value = false
+                    mediaController?.createActListen(song)
+                }
                 // Same song, toggle play/pause
                 if (_isPlaying.value) {
                     mediaController?.pause()
@@ -284,7 +305,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             legacyPlaySong(song)
         }
     }
-
 
     private fun legacyPlaySong(song: Songs) {
         if (_currentSong.value != song) {
@@ -338,12 +358,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun releaseMediaPlayer() {
+        Log.d(TAG, "Releasing legacy MediaPlayer")
         mediaPlayer?.release()
         mediaPlayer = null
         _isPlaying.value = false
         _currentSong.value = null
-        deactivateMiniPlayer()
-    }    fun seekTo(position: Int) {
+        _currentPosition.value = 0
+    }
+
+
+    fun seekTo(position: Int) {
         if (serviceBound && mediaController != null) {
             mediaController?.seekTo(position)
         } else {
@@ -354,12 +378,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
-        if (serviceConnection != null) {
-            getApplication<Application>().applicationContext.unbindService(serviceConnection!!)
+        Log.d(TAG, "MainViewModel: onCleared called")
+        if (serviceBound && serviceConnection != null) {
+            val context = getApplication<Application>().applicationContext
+            try {
+                context.unbindService(serviceConnection!!)
+                serviceConnection = null
+                serviceBound = false
+                mediaController = null
+                Log.d(TAG, "Media service unbound")
+            } catch (e: IllegalArgumentException) {
+                Log.e(TAG, "Error unbinding service: ${e.message}")
+            }
         }
-        // Legacy cleanup
+        // Legacy cleanup (ensure it's still done if service wasn't bound)
         releaseMediaPlayer()
-    }    private fun skipNext(songId: Int) {
+    }
+
+
+
+    private fun skipNext(songId: Int) {
         if (skipToNextNavigationCallback != null) {
             val isOnline = _isOnlineSong.value
             val region = "GLOBAL"

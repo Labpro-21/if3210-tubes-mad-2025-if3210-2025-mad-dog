@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberAsyncImagePainter
 import com.example.purrytify.R
+import com.example.purrytify.ui.screens.soundcapsule.SoundCapsuleCard // Pastikan path sudah benar
 import com.example.purrytify.ui.theme.SpotifyGreen
 
 @Composable
@@ -66,6 +67,7 @@ fun ProfileScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val scrollState = rememberScrollState()
+    val soundCapsuleData by viewModel.soundCapsuleData.collectAsState() // Ambil state SoundCapsule
 
     // Fetch profile data when first loaded and when returning to this screen
     LaunchedEffect(Unit) {
@@ -73,6 +75,7 @@ fun ProfileScreen(
         viewModel.getSongsCount()
         viewModel.getFavoriteSongsCount()
         viewModel.getTotalListenedCount()
+        viewModel.getSoundCapsule() // Panggil fungsi untuk mengambil SoundCapsule data
     }
 
     LaunchedEffect(profile) {
@@ -98,7 +101,7 @@ fun ProfileScreen(
                     )
                 )
             )
-            .then(if (isLandscape) Modifier.verticalScroll(scrollState) else Modifier),
+            .verticalScroll(scrollState), // Terapkan verticalScroll di semua orientasi
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center // Untuk memusatkan konten error/no internet
     ) {
@@ -193,6 +196,10 @@ fun ProfileScreen(
                     icon = Icons.Default.Settings,
                     onClick = onNavigateToSettings
                 )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Panggil composable SoundCapsuleCard di sini
+                SoundCapsuleCard(soundCapsule = soundCapsuleData)
             }
         }
     }
@@ -260,7 +267,8 @@ fun ProfileScreenPreview() {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.DarkGray),
+                .background(Color.DarkGray)
+                .verticalScroll(rememberScrollState()), // Tambahkan verticalScroll di preview juga
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(40.dp))
@@ -287,6 +295,8 @@ fun ProfileScreenPreview() {
             }
             Spacer(modifier = Modifier.height(60.dp))
             ProfileMenuItem(title = "Settings", icon = Icons.Default.Settings, onClick = {})
+            Spacer(modifier = Modifier.height(16.dp))
+            SoundCapsuleCard(soundCapsule = null) // Tambahkan preview SoundCapsule
         }
     }
 }

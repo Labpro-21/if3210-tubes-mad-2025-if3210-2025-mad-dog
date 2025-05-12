@@ -13,6 +13,7 @@ import com.example.purrytify.data.repository.ProfileRepository
 import com.example.purrytify.data.model.ProfileResponse
 import com.example.purrytify.data.repository.ListeningActivityRepository
 import com.example.purrytify.db.AppDatabase
+import com.example.purrytify.db.dao.ListeningActivityDao
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,11 +55,40 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private val _currentLocation = MutableStateFlow<String?>(null)
     val currentLocation: StateFlow<String?> = _currentLocation
 
+    private val _soundCapsuleData = MutableStateFlow<ListeningActivityDao.SoundCapsule?>(null)
+    val soundCapsuleData: StateFlow<ListeningActivityDao.SoundCapsule?> = _soundCapsuleData
+
     private val authRepository = AuthRepository.getInstance(application)
 
     private val listenActivityDao = AppDatabase.getDatabase(application).listeningCapsuleDao()
     private val listenActivityRepository = ListeningActivityRepository.getInstance(listenActivityDao)
+    fun getSoundCapsule() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val userId = authRepository.currentUserId
+            if (userId != null) {
+                try {
+                    val soundCapsuleResult = listenActivityRepository.getSoundCapsuleData(userId)
+                    _soundCapsuleData.value = soundCapsuleResult
+                    Log.d("SoundCapsuleData", "Result from DB: $soundCapsuleResult")
+                    Log.d(
+                        "SoundCapsuleData",
+                        "Total Listening Time: ${soundCapsuleResult.totalTimeListened}"
+                    )
+                    Log.d("SoundCapsuleData", "Top Artist: ${soundCapsuleResult.topArtist}")
+                    Log.d("SoundCapsuleData", "Top Song: ${soundCapsuleResult.topSong.toString()}")
+                    Log.d("SoundCapsuleData", "ListenedDayStreak: ${soundCapsuleResult.listeningDayStreak}")
+                    Log.d("SoundCapsuleData", "Month year: ${soundCapsuleResult.monthYear}")
 
+                } catch (e: Exception) {
+                    Log.e("ProfileViewModel", "Error fetching sound capsule data: ${e.message}", e)
+                    _isError.value = true // Set error state jika gagal mengambil data dari DB
+                }
+            } else {
+                Log.e("ProfileViewModel", "User ID is null, cannot fetch sound capsule data.")
+                _isError.value = true // Set error state jika User ID null
+            }
+        }
+    }
     fun getProfile() {
         viewModelScope.launch(Dispatchers.IO) { // Gunakan Dispatchers.IO untuk operasi database
             _isLoading.value = true
@@ -74,8 +104,10 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                         "Total Listening Time: ${soundCapsuleData.totalTimeListened}"
                     )
                     Log.d("SoundCapsuleData", "Top Artist: ${soundCapsuleData.topArtist}")
-                    Log.d("SoundCapsuleData", "Top Song: ${soundCapsuleData.topSong}")
+                    Log.d("SoundCapsuleData", "Top Song: ${soundCapsuleData.topSong.toString()}")
                     Log.d("SoundCapsuleData", "ListenedDayStreak: ${soundCapsuleData.listeningDayStreak}")
+                    Log.d("SoundCapsuleData", "Month year: ${soundCapsuleData.monthYear}")
+
                 } catch (e: Exception) {
                     Log.e("ProfileViewModel", "Error fetching sound capsule data: ${e.message}", e)
                     _isError.value = true // Set error state jika gagal mengambil data dari DB

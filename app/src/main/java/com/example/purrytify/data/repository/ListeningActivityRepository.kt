@@ -50,7 +50,7 @@ class ListeningActivityRepository private constructor(
         return listeningActivityDao.getTopArtistThisMonth(userId)
     }
 
-    suspend fun getTopSongThisMonth(userId: Int): ListeningActivityDao.TopSong? {
+    suspend fun getTopSongThisMonth(userId: Int): ListeningActivityDao.TopSongComplete? {
         return listeningActivityDao.getTopSongThisMonth(userId)
     }
 
