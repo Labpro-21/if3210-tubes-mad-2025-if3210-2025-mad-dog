@@ -57,21 +57,21 @@ interface ListeningActivityDao {
     )
     fun getTopArtistThisMonth(userId: Int): TopArtist?
 
-    // Changed return type to TopSong data class instead of String
+    // Modified to return more complete song information
     @Query(
         """
-        SELECT s.name, COUNT(la.songId) AS playCount
+        SELECT s.id, s.name, s.artist, s.description, s.duration, s.artwork, COUNT(la.songId) AS playCount
         FROM listening_activity la
         JOIN songs s ON la.songId = s.id
         WHERE la.userId = :userId
         AND strftime('%Y-%m', la.startTime / 1000, 'unixepoch', 'localtime') = strftime('%Y-%m', 'now', 'localtime')
         AND la.completed = 1
-        GROUP BY s.name
+        GROUP BY s.id
         ORDER BY playCount DESC
         LIMIT 1
         """
     )
-    fun getTopSongThisMonth(userId: Int): TopSong?
+    fun getTopSongThisMonth(userId: Int): TopSongComplete?
 
     @Query(
         """
@@ -93,9 +93,14 @@ interface ListeningActivityDao {
         val playCount: Int
     )
 
-    // Data class for query results
-    data class TopSong(
+    // New data class with complete song information
+    data class TopSongComplete(
+        val id: Int,
         val name: String,
+        val artist: String,
+        val description: String,
+        val duration: Long,
+        val artwork: String?,
         val playCount: Int
     )
 
@@ -132,7 +137,7 @@ interface ListeningActivityDao {
         return maxStreak
     }
 
-    // Fungsi untuk mendapatkan semua data Sound Capsule dalam satu objek
+    // Updated function to get all Sound Capsule data with complete song information
     @Transaction
     fun getSoundCapsuleData(userId: Int): SoundCapsule {
         val totalTime = getTotalListeningTimeThisMonth(userId)
@@ -143,16 +148,16 @@ interface ListeningActivityDao {
         return SoundCapsule(
             totalTimeListened = totalTime,
             topArtist = topArtistResult?.artist,
-            topSong = topSongResult?.name,
+            topSong = topSongResult, // Now passing the entire TopSongComplete object
             listeningDayStreak = dayStreak
         )
     }
 
-    // Data class untuk menampung data Sound Capsule
+    // Updated data class for Sound Capsule with complete song information
     data class SoundCapsule(
         val totalTimeListened: Long,
         val topArtist: String?,
-        val topSong: String?,
+        val topSong: TopSongComplete?, // Changed from String? to TopSongComplete?
         val listeningDayStreak: Int
     )
 }

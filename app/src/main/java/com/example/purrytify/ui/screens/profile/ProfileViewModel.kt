@@ -74,7 +74,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                         "Total Listening Time: ${soundCapsuleData.totalTimeListened}"
                     )
                     Log.d("SoundCapsuleData", "Top Artist: ${soundCapsuleData.topArtist}")
-                    Log.d("SoundCapsuleData", "Top Song: ${soundCapsuleData.topSong}")
+                    Log.d("SoundCapsuleData", "Top Song: ${soundCapsuleData.topSong.toString()}")
                     Log.d("SoundCapsuleData", "ListenedDayStreak: ${soundCapsuleData.listeningDayStreak}")
                 } catch (e: Exception) {
                     Log.e("ProfileViewModel", "Error fetching sound capsule data: ${e.message}", e)

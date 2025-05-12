@@ -470,7 +470,7 @@ fun SongDetailsContent(
                 IconButton(onClick = {
                     mainViewModel.playSong(song)
                     viewModel.insertRecentlyPlayed(song, isOnline)
-                    viewModel.insertListeningActivity(song,isOnline)
+                    //viewModel.insertListeningActivity(song,isOnline)
                 }) {
                     Icon(
                         imageVector = if (isPlaying && isSameSong) Icons.Filled.Pause else Icons.Filled.PlayArrow,

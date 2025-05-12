@@ -25,14 +25,21 @@ import coil.request.ImageRequest
 import coil.request.SuccessResult
 import com.example.purrytify.MainActivity
 import com.example.purrytify.R
+import com.example.purrytify.data.auth.AuthRepository
+import com.example.purrytify.data.repository.ListeningActivityRepository
+import com.example.purrytify.db.AppDatabase
+import com.example.purrytify.db.dao.ListeningActivityDao
+import com.example.purrytify.db.entity.ListeningActivity
 import com.example.purrytify.db.entity.Songs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Date
 
 class MediaPlayerController private constructor(private val context: Context) {    companion object {
         private const val NOTIFICATION_ID = 1
@@ -58,6 +65,15 @@ class MediaPlayerController private constructor(private val context: Context) { 
     private lateinit var audioManager: AudioManager
     private lateinit var audioFocusRequest: AudioFocusRequest
     private val coroutineScope = CoroutineScope(Dispatchers.Main)    // Track states
+
+    // New fields for listening activity tracking
+    private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var listenActivityRepository: ListeningActivityRepository
+    private var listenActivityDao: ListeningActivityDao
+    private var authRepository: AuthRepository
+    private var currentActivityId: Long? = null
+    private var isOnlineSong = MutableStateFlow(false)
+
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
@@ -74,14 +90,22 @@ class MediaPlayerController private constructor(private val context: Context) { 
     var skipToNextCallback: ((Int) -> Unit)? = null
     var skipToPreviousCallback: ((Int) -> Unit)? = null
     var playbackFinishedCallback: (() -> Unit)? = null
-    
+
     private var updatePositionJob: kotlinx.coroutines.Job? = null
 
     init {
+        listenActivityDao = AppDatabase.getDatabase(context).listeningCapsuleDao()
+        listenActivityRepository = ListeningActivityRepository.getInstance(listenActivityDao)
+        authRepository = AuthRepository.getInstance(context)
+
+
         setupMediaPlayer()
         setupMediaSession()
         setupNotificationChannel()
         setupAudioFocus()
+    }
+    fun setIsOnlineSong(isOnline: Boolean) {
+        isOnlineSong.value = isOnline
     }
 
     private fun setupMediaPlayer() {
@@ -98,6 +122,10 @@ class MediaPlayerController private constructor(private val context: Context) { 
             // Reset position to 0 when song completes
             _currentPosition.value = 0
             updatePositionJob?.cancel()
+            if (!isOnlineSong.value) {
+                Log.d(TAG,"Complete listening act!")
+                completeListeningActivity()
+            }
 
             // Update media session playback state to stopped
             val playbackState = PlaybackStateCompat.Builder()
@@ -126,7 +154,26 @@ class MediaPlayerController private constructor(private val context: Context) { 
             play()
         }
     }
+    private fun createListeningActivity(song: Songs) {
+        if (isOnlineSong.value) return // Skip for online songs
 
+        serviceScope.launch {
+            authRepository.currentUserId?.let { userId ->
+                val newActivity = ListeningActivity(
+                    userId = userId,
+                    songId = song.id,
+                    startTime = Date(),
+                    endTime = null,
+                    duration = 0L,
+                    completed = false
+                )
+                currentActivityId = listenActivityRepository.insert(newActivity)
+                Log.d(TAG, "Created listening activity ID: $currentActivityId for song ID: ${song.id}")
+            } ?: run {
+                Log.w(TAG, "User ID is null, cannot create listening activity.")
+            }
+        }
+    }
 
     private fun setupMediaSession() {
         mediaSession = MediaSessionCompat(context, "PurrytifyMediaSession")
@@ -162,7 +209,7 @@ class MediaPlayerController private constructor(private val context: Context) { 
 
     private fun setupNotificationChannel() {
         notificationManager = NotificationManagerCompat.from(context)
-        
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
@@ -178,7 +225,7 @@ class MediaPlayerController private constructor(private val context: Context) { 
 
     private fun setupAudioFocus() {
         audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
                 .setAudioAttributes(
@@ -214,9 +261,15 @@ class MediaPlayerController private constructor(private val context: Context) { 
             loadSong(songs[startIndex])
         }
     }
+    fun createActListen(song: Songs){
+        if (!isOnlineSong.value) {
+            createListeningActivity(song)
+        }
+    }
 
     fun loadSong(song: Songs) {
         try {
+            Log.d(TAG,"load song initiated, song: ${song.name}")
             // Reset position first
             _currentPosition.value = 0
 
@@ -227,6 +280,10 @@ class MediaPlayerController private constructor(private val context: Context) { 
             mediaPlayer.setDataSource(context, Uri.parse(song.filePath))
             mediaPlayer.prepareAsync()
             _currentSong.value = song
+            if (!isOnlineSong.value) {
+                createListeningActivity(song)
+            }
+
             updateMetadata(song)
             updateNotification()
         } catch (e: Exception) {
@@ -237,7 +294,7 @@ class MediaPlayerController private constructor(private val context: Context) { 
 
     fun play() {
         val currentSong = _currentSong.value ?: return
-        
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val result = audioManager.requestAudioFocus(audioFocusRequest)
             if (result != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) return
@@ -259,7 +316,7 @@ class MediaPlayerController private constructor(private val context: Context) { 
 
         mediaPlayer.start()
         _isPlaying.value = true
-        
+
         val playbackState = PlaybackStateCompat.Builder()
             .setState(
                 PlaybackStateCompat.STATE_PLAYING,
@@ -272,7 +329,7 @@ class MediaPlayerController private constructor(private val context: Context) { 
                 PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
             )
             .build()
-        
+
         mediaSession.setPlaybackState(playbackState)
         updateNotification()
         updateCurrentPosition()
@@ -282,7 +339,7 @@ class MediaPlayerController private constructor(private val context: Context) { 
         if (mediaPlayer.isPlaying) {
             mediaPlayer.pause()
             _isPlaying.value = false
-            
+
             val playbackState = PlaybackStateCompat.Builder()
                 .setState(
                     PlaybackStateCompat.STATE_PAUSED,
@@ -295,19 +352,49 @@ class MediaPlayerController private constructor(private val context: Context) { 
                     PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
                 )
                 .build()
-            
+
             mediaSession.setPlaybackState(playbackState)
             updateNotification()
             updatePositionJob?.cancel()
         }
     }
-
+    private fun completeListeningActivity() {
+        if (isOnlineSong.value) {
+            Log.d(TAG,"completeListeningAct: Online! skip")
+            return
+        } // Skip for online songs
+        Log.d(TAG,"completeListeningAct: Offline! handle")
+        serviceScope.launch {
+            Log.d(TAG, "Entering serviceScope.launch") // Add this log
+            currentActivityId?.let { id ->
+                try {
+                    val existingActivity = listenActivityDao.getById(id.toInt())
+                    Log.d(TAG,"exist activity: $existingActivity")
+                    existingActivity?.let {
+                        val endTime = Date()
+                        val actualDuration = endTime.time - it.startTime.time
+                        val updatedActivity = it.copy(endTime = endTime, duration = actualDuration, completed = true)
+                        listenActivityRepository.update(updatedActivity)
+                        Log.d(TAG, "Completed listening activity ID: $id, Duration: $actualDuration ms")
+                    } ?: run {
+                        Log.w(TAG, "Listening activity with ID $id not found for completion.")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error completing listening activity: ${e.message}")
+                }
+            }
+        }
+    }
     fun stop() {
+        // Complete listening activity before stopping
+        if (!isOnlineSong.value) {
+            completeListeningActivity()
+        }
         mediaPlayer.stop()
         _isPlaying.value = false
         clearNotification()
         updatePositionJob?.cancel()
-        
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             audioManager.abandonAudioFocusRequest(audioFocusRequest)
         } else {
@@ -331,14 +418,14 @@ class MediaPlayerController private constructor(private val context: Context) { 
 
     private suspend fun getBitmapFromUri(uri: Uri?): Bitmap? {
         if (uri == null) return null
-        
+
         return try {
             val loader = ImageLoader(context)
             val request = ImageRequest.Builder(context)
                 .data(uri)
                 .allowHardware(false)
                 .build()
-                
+
             val result = (loader.execute(request) as? SuccessResult)?.drawable
             if (result != null) {
                 (result as? android.graphics.drawable.BitmapDrawable)?.bitmap
@@ -356,7 +443,7 @@ class MediaPlayerController private constructor(private val context: Context) { 
             val artworkUri = song.artwork?.let { Uri.parse(it) }
             val bitmap = artworkUri?.let { getBitmapFromUri(it) }
                 ?: BitmapFactory.decodeResource(context.resources, R.drawable.music_placeholder)
-            
+
             val metadata = MediaMetadataCompat.Builder()
                 .putString(MediaMetadataCompat.METADATA_KEY_TITLE, song.name)
                 .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, song.artist)
@@ -364,14 +451,14 @@ class MediaPlayerController private constructor(private val context: Context) { 
                 .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, song.duration)
                 .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, bitmap)
                 .build()
-            
+
             mediaSession.setMetadata(metadata)
         }
     }
 
     private fun updateNotification() {
         val currentSong = _currentSong.value ?: return
-        
+
         coroutineScope.launch {
             val notification = buildNotification(currentSong)
             try {
@@ -439,9 +526,9 @@ class MediaPlayerController private constructor(private val context: Context) { 
             setPackage(context.packageName)
         }
         return PendingIntent.getBroadcast(
-            context, 
-            action.hashCode(), 
-            intent, 
+            context,
+            action.hashCode(),
+            intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
     }
@@ -457,18 +544,22 @@ class MediaPlayerController private constructor(private val context: Context) { 
     }
 
     fun release() {
+        // Complete any active listening activity
+        if (!isOnlineSong.value) {
+            completeListeningActivity()
+        }
         mediaPlayer.release()
         mediaSession.release()
         clearNotification()
         updatePositionJob?.cancel()
-        
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             audioManager.abandonAudioFocusRequest(audioFocusRequest)
         } else {
             @Suppress("DEPRECATION")
             audioManager.abandonAudioFocus(null)
         }
-        
+
         instance = null
     }
 }
