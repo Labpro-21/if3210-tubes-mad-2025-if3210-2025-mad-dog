@@ -220,6 +220,15 @@ fun AppNavigation(
                         mainViewModel = mainViewModel,
                         isOnline = false
                     )
+                    
+                    val songDetailViewModel = androidx.lifecycle.viewmodel.compose.viewModel<com.example.purrytify.ui.screens.songdetail.SongDetailViewModel>()
+                    
+                    LaunchedEffect(Unit) {
+                        mainViewModel.registerNavigationCallbacks(
+                            skipToNext = songDetailViewModel::skipNext,
+                            skipToPrevious = songDetailViewModel::skipPrevious
+                        )
+                    }
                 }
                 composable(
                     Screen.SongDetailOnline.route,
@@ -237,6 +246,15 @@ fun AppNavigation(
                         isOnline = true,
                         region = region
                     )
+                    
+                    val songDetailViewModel = androidx.lifecycle.viewmodel.compose.viewModel<com.example.purrytify.ui.screens.songdetail.SongDetailViewModel>()
+                    
+                    LaunchedEffect(Unit) {
+                        mainViewModel.registerNavigationCallbacks(
+                            skipToNext = songDetailViewModel::skipNext,
+                            skipToPrevious = songDetailViewModel::skipPrevious
+                        )
+                    }
                 }
             }
         }

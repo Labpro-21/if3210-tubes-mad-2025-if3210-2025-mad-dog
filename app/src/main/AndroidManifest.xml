@@ -7,7 +7,10 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />    <application
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" /><application
         android:name=".PurrytifyApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -42,9 +45,25 @@
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
+                android:name="android.support.FILE_PROVIDER_PATHS"                android:resource="@xml/file_paths" />
         </provider>
+        
+        <service
+            android:name=".media.MediaPlaybackService"
+            android:foregroundServiceType="mediaPlayback"
+            android:enabled="true"
+            android:exported="false" />
+            
+        <receiver
+            android:name=".media.MediaNotificationReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.purrytify.ACTION_PLAY" />
+                <action android:name="com.example.purrytify.ACTION_PAUSE" />
+                <action android:name="com.example.purrytify.ACTION_NEXT" />
+                <action android:name="com.example.purrytify.ACTION_PREVIOUS" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
