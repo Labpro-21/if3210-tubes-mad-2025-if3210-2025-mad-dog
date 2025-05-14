@@ -127,7 +127,8 @@ fun HomeScreenContent(
             if (dailyPlayList.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(24.dp))
                 DailyPlaylistCard(dailyPlayList) {
-                    onNavigate("albumDetails/dailyPlaylist")
+                    
+                     onNavigate("album/GLOBAL?isDailyPlaylist=true")
                 }
                 Spacer(modifier = Modifier.height(24.dp))
             }

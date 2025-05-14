@@ -70,10 +70,15 @@ fun AlbumScreen(
     region: String,
     navController: NavController,
     albumViewModel: AlbumViewModel = viewModel(factory = AlbumViewModel.Factory(LocalContext.current.applicationContext as Application)),
-    mainViewModel: MainViewModel
+    mainViewModel: MainViewModel,
+    isDailyPlaylist: Boolean = false 
 ) {
-    LaunchedEffect(region) {
-        albumViewModel.loadSongs(region)
+    LaunchedEffect(region, isDailyPlaylist) {
+        if (isDailyPlaylist) {
+                albumViewModel.loadDailyPlaylist(region)
+        } else {
+            albumViewModel.loadSongs(region)
+        }
     }
 
     val songs by albumViewModel.songs.collectAsState()
@@ -82,7 +87,21 @@ fun AlbumScreen(
     val downloadProgress by albumViewModel.downloadProgress.collectAsState()
     val context = LocalContext.current
 
-    val imageName = "top50${region.lowercase(Locale.ROOT)}"
+    // Determine the correct image and title based on type
+    val (imageName, title, description) = if (isDailyPlaylist) {
+        Triple(
+            "daily_${region.lowercase(Locale.ROOT)}", 
+            "Daily Mix - ${region.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }}", 
+            "Your daily personalized playlist based on your listening habits in ${region.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }}."
+        )
+    } else {
+        Triple(
+            "top50${region.lowercase(Locale.ROOT)}", 
+            "Top 50 ${region.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }}", 
+            "The hottest tracks in ${region.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }} right now. Updated daily."
+        )
+    }
+    
     val imageId = context.resources.getIdentifier(imageName, "drawable", context.packageName)
     val artworkResource = if (imageId != 0) imageId else R.drawable.music_placeholder
 
@@ -119,7 +138,7 @@ fun AlbumScreen(
             ) {
                 Image(
                     painter = painterResource(id = artworkResource),
-                    contentDescription = "Top 50 $region",
+                    contentDescription = title,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
@@ -128,7 +147,7 @@ fun AlbumScreen(
 
         // Title and Description
         Text(
-            text = "Top 50 ${region.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }}",
+            text = title,
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
@@ -138,7 +157,7 @@ fun AlbumScreen(
                 .padding(bottom = 8.dp)
         )
         Text(
-            text = "The hottest tracks in ${region.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }} right now. Updated daily.",
+            text = description,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
             textAlign = TextAlign.Center,
@@ -178,7 +197,13 @@ fun AlbumScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
-                onClick = { albumViewModel.downloadSongs(region = region, userId = albumViewModel.getCurrentUserid()) },
+                onClick = { 
+                    albumViewModel.downloadSongs(
+                        region = region, 
+                        userId = albumViewModel.getCurrentUserid(),
+                        isDailyPlaylist = isDailyPlaylist
+                    ) 
+                },
                 modifier = Modifier
                     .size(36.dp)
                     .padding(start = 12.dp),
@@ -265,7 +290,12 @@ fun AlbumScreen(
                 contentPadding = PaddingValues(bottom = 16.dp)
             ) {
                 itemsIndexed(songs) { _, song ->
-                    SongItemRow(song = song, navController = navController, region = region)
+                    SongItemRow(
+                        song = song, 
+                        navController = navController, 
+                        region = region,
+                        isDailyPlaylist = isDailyPlaylist
+                    )
                 }
             }
         }
@@ -273,27 +303,47 @@ fun AlbumScreen(
 }
 
 @Composable
-fun SongItemRow(song: OnlineSongResponse, navController: NavController, region: String) {
+fun SongItemRow(
+    song: OnlineSongResponse, 
+    navController: NavController, 
+    region: String,
+    isDailyPlaylist: Boolean = false
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0f))
             .clickable {
-                navController.navigate(Screen.SongDetailOnline.route.replace("{region}", region).replace("{songId}", song.id.toString()))
+                val route = if (isDailyPlaylist) {
+                    Screen.SongDetailOnline.route
+                        .replace("{region}", region)
+                        .replace("{songId}", song.id.toString()) + 
+                        (if (isDailyPlaylist) "?isDailyPlaylist=true" else "")
+                } else {
+                    Screen.SongDetailOnline.route
+                        .replace("{region}", region)
+                        .replace("{songId}", song.id.toString())
+                }
+                navController.navigate(route)
             }
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = song.rank.toString(),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .padding(horizontal = 12.dp)
-                .width(24.dp)
-        )
+        if (!isDailyPlaylist) {
+            Text(
+                text = song.rank.toString(),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .padding(horizontal = 12.dp)
+                    .width(24.dp)
+            )
+        } else {
+            Spacer(modifier = Modifier.width(4.dp))
+        }
+        
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(song.artwork)

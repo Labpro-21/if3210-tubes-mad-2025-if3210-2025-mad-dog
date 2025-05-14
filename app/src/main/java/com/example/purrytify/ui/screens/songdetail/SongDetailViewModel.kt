@@ -13,6 +13,7 @@ import com.example.purrytify.db.entity.RecentlyPlayed
 import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.data.model.OnlineSongResponse
 import com.example.purrytify.data.repository.ListeningActivityRepository
+import com.example.purrytify.data.repository.RecommendationRepository
 import com.example.purrytify.db.entity.ListeningActivity
 import com.example.purrytify.utils.DownloadUtils
 import com.example.purrytify.utils.MediaUtils
@@ -33,6 +34,7 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
     private val listenActivityRepository = ListeningActivityRepository.getInstance(listenActivityDao)
     private val authRepository = AuthRepository.getInstance(application)
     private val onlineSongRepository = OnlineSongRepository.getInstance(application)
+    private val RecommendationRepository = RecommendationRepository(songDao, context, onlineSongRepository)
     private val _isUpdateSuccessful = MutableStateFlow(false)
     val isUpdateSuccessful: StateFlow<Boolean> = _isUpdateSuccessful
     private val _songDetails = MutableStateFlow<SongDetailUiState>(SongDetailUiState.Loading)
@@ -173,58 +175,75 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun loadSongDetails(songId: Int, isOnline: Boolean = false, region: String = "GLOBAL") {
+    fun loadSongDetails(songId: Int, isOnline: Boolean = false, region: String = "GLOBAL", isDailyPlaylist: Boolean = false) {
         viewModelScope.launch {
             _songDetails.value = SongDetailUiState.Loading // Set loading state
 
             try {
                 if (isOnline) {
-                    // Ensure online songs are loaded and wait for completion
-                    var loadedSuccessfully = false
-                    if (_onlineSongs.value.isEmpty()) {
-                        Log.d(tag, "Online songs empty, loading now...")
-                        loadedSuccessfully = loadOnlineSongsSync(region)
-                        Log.d(tag, "Online songs loaded successfully: $loadedSuccessfully")
-                    } else {
-                        loadedSuccessfully = true
-                    }
-
-                    if (!loadedSuccessfully) {
-                        _songDetails.value = SongDetailUiState.Error("Failed to load online songs")
-                        return@launch
-                    }
-
-                    val onlineSong = _onlineSongs.value.find { it.id == songId }
-                    Log.d(tag, "Album Region: $region")
-                    Log.d(tag, "Online songs count: ${_onlineSongs.value.size}")
-                    Log.d(tag, "Looking for song ID: $songId")
-                    Log.d(tag, "Found online song: $onlineSong")
-                    setCurrentOnlineSongId(songId)
-                    setCurrentOnlineRegion(region)
-
-                    if (onlineSong != null) {
-                        // Map OnlineSongResponse to Songs (local database entity)
-                        val song = Songs(
-                            id = onlineSong.id,
-                            name = onlineSong.title,
-                            artist = onlineSong.artist,
-                            artwork = onlineSong.artwork,
-                            description = onlineSong.country,
-                            filePath = onlineSong.url,
-                            duration = MediaUtils.parseDuration(onlineSong.duration),
-                            isFavorite = false,
-                            userId = authRepository.currentUserId ?: 0,
-                            uploadDate = Date()
+                    if (isDailyPlaylist) {
+                        val song = songDao.getSongById(songId)
+                        if (song != null) {
+                            _songDetails.value = SongDetailUiState.Success(song)
+                            return@launch
+                        }
+                        
+                        // Not Found in db
+                        val userId = authRepository.currentUserId ?: return@launch
+                        val recommendationRepository = RecommendationRepository(
+                            songDao,
+                            context,
+                            onlineSongRepository
                         )
-                        _songDetails.value = SongDetailUiState.Success(song)
-
-                        // Check if song is already downloaded
-                        checkIfAlreadyDownloaded(songId)
+                        
+                        val dailyPlaylist = recommendationRepository.getDailyPlaylist(userId)
+                        val playlistSong = dailyPlaylist.find { it.id == songId }
+                        
+                        if (playlistSong != null) {
+                            _songDetails.value = SongDetailUiState.Success(playlistSong)
+                        } else {
+                            _songDetails.value = SongDetailUiState.Error("Song not found in daily playlist")
+                        }
                     } else {
-                        _songDetails.value = SongDetailUiState.Error("Online song not found")
+                        // Regular online song handling
+                        var loadedSuccessfully = false
+                        if (_onlineSongs.value.isEmpty()) {
+                            loadedSuccessfully = loadOnlineSongsSync(region)
+                        } else {
+                            loadedSuccessfully = true
+                        }
+
+                        if (!loadedSuccessfully) {
+                            _songDetails.value = SongDetailUiState.Error("Failed to load online songs")
+                            return@launch
+                        }
+
+                        val onlineSong = _onlineSongs.value.find { it.id == songId }
+                        setCurrentOnlineSongId(songId)
+                        setCurrentOnlineRegion(region)
+
+                        if (onlineSong != null) {
+                            // Convert to Songs entity
+                            val song = Songs(
+                                id = onlineSong.id,
+                                name = onlineSong.title,
+                                artist = onlineSong.artist,
+                                artwork = onlineSong.artwork,
+                                description = onlineSong.country,
+                                filePath = onlineSong.url,
+                                duration = MediaUtils.parseDuration(onlineSong.duration),
+                                isFavorite = false,
+                                userId = authRepository.currentUserId ?: 0,
+                                uploadDate = Date()
+                            )
+                            _songDetails.value = SongDetailUiState.Success(song)
+                            checkIfAlreadyDownloaded(songId)
+                        } else {
+                            _songDetails.value = SongDetailUiState.Error("Online song not found")
+                        }
                     }
                 } else {
-                    // Fetch from local database
+                    // Regular local database fetch
                     loadUserSongIds()
                     val song = songDao.getSongById(songId)
                     if (song != null) {

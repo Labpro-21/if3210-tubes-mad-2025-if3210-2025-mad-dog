@@ -260,13 +260,24 @@ fun AppNavigation(
                     }
                 }
 
-                composable("albumDetails/dailyPlaylist") {
-                    val homeViewModel = viewModel<HomeViewModel>()
-                    val dailyPlaylist by homeViewModel.dailyPlaylist.collectAsState()
-                    DailyPlaylistDetailScreen(
-                        dailyPlaylist = dailyPlaylist,
+                composable(
+                    route = "album/{region}?isDailyPlaylist={isDailyPlaylist}",
+                    arguments = listOf(
+                        navArgument("region") { type = NavType.StringType },
+                        navArgument("isDailyPlaylist") { 
+                            type = NavType.BoolType
+                            defaultValue = false 
+                        }
+                    )
+                ) { backStackEntry ->
+                    val region = backStackEntry.arguments?.getString("region") ?: "GLOBAL"
+                    val isDailyPlaylist = backStackEntry.arguments?.getBoolean("isDailyPlaylist") ?: false
+                    
+                    AlbumScreen(
+                        region = region,
                         navController = navController,
-                        mainViewModel = mainViewModel
+                        mainViewModel = mainViewModel,
+                        isDailyPlaylist = isDailyPlaylist
                     )
                 }
             }

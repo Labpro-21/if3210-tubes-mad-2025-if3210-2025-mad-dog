@@ -14,9 +14,10 @@ class RecommendationRepository(
     private val onlineSongRepository: OnlineSongRepository
 )
 {
-    suspend fun getDailyPlaylist(userId: Int, limit: Int = 20): List<Songs> = withContext(Dispatchers.IO){
+    suspend fun getDailyPlaylist(userId: Int, region: String = "GLOBAL", limit: Int = 20): List<Songs> = withContext(Dispatchers.IO) {
         val localSongs = songsDao.getAllSongsForUser(userId).firstOrNull() ?: emptyList()
-        val onlineSongs = onlineSongRepository.getTopGlobalSongs() ?: emptyList()
+        
+        val onlineSongs = onlineSongRepository.getTopCountrySongs(region) ?: emptyList()
 
         val onlineAsLocal = onlineSongs.map { online ->
             Songs(
