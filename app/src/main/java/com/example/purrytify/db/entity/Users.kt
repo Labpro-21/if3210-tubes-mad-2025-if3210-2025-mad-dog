@@ -2,6 +2,7 @@ package com.example.purrytify.db.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import java.util.Date
 
 @Entity(tableName = "users")
 data class Users(
@@ -10,5 +11,6 @@ data class Users(
     val name: String,
     val totalPlayed: Int = 0,
     val monthlyListeningTime: Long = 0, // Total waktu dengarkan dalam milidetik bulan ini
-    val lastUpdatedMonth: Int = 0 // Bulan terakhir data diperbarui
+    val lastUpdatedMonth: Int = 0, // Bulan terakhir data diperbarui
+    var dailyPlaylistLastFetched: Date? = null
 )

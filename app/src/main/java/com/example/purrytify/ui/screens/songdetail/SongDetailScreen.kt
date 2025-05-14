@@ -68,6 +68,7 @@ fun SongDetailScreen(
     mainViewModel: MainViewModel,
     isOnline: Boolean,
     region: String = "GLOBAL",
+    isDailyPlaylist: Boolean = false
 ) {
     val uiState by viewModel.songDetails.collectAsState()
     //val playbackCompletedState by mainViewModel.isPlaybackCompleted.collectAsState()
@@ -92,7 +93,7 @@ fun SongDetailScreen(
 */
     LaunchedEffect(songId, isOnline, region) {
         mainViewModel.setIsOnlineSong(isOnline)
-        viewModel.loadSongDetails(songId, isOnline = isOnline, region = region)
+        viewModel.loadSongDetails(songId, isOnline = isOnline, region = region,isDailyPlaylist = isDailyPlaylist    )
     }
     LaunchedEffect(isUpdateSuccessful) {
         if (isUpdateSuccessful) {

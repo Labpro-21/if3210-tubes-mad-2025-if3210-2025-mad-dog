@@ -12,8 +12,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,16 +46,24 @@ fun HomeScreen(
 ) {
     val recentlyPlayedSongs = homeViewModel.recentlyPlayedSongs.collectAsState(initial = emptyList()).value
     val newAddedSongs = homeViewModel.newAddedSongs.collectAsState(initial = emptyList()).value
+    val dailyPlayList = homeViewModel.dailyPlaylist.collectAsState(initial = emptyList()).value
     Log.d("Init home played songs: ", "$recentlyPlayedSongs")
     Log.d("Init home new songs: ", "$newAddedSongs")
     Log.d("USER ID INIT: ", "${homeViewModel.userId}")
 
+    
+    LaunchedEffect(dailyPlayList.isEmpty()) {
+        if (dailyPlayList.isEmpty()) {
+            homeViewModel.loadDailyPlaylist()
+        }
+    }
 
     Scaffold { paddingValues ->
         HomeScreenContent(
             modifier = Modifier.padding(paddingValues),
             recentlyPlayedSongs = recentlyPlayedSongs,
             newAddedSongs = newAddedSongs,
+            dailyPlayList= dailyPlayList,
             onNavigate = { route -> navController.navigate(route) }
         )
     }
@@ -64,6 +74,7 @@ fun HomeScreenContent(
     modifier: Modifier = Modifier,
     recentlyPlayedSongs: List<RecentlyPlayedWithSong>,
     newAddedSongs: List<Songs>,
+    dailyPlayList: List<Songs>,
     onNavigate: (String) -> Unit
 ) {
     val configuration = LocalConfiguration.current
@@ -114,6 +125,17 @@ fun HomeScreenContent(
             )
             Spacer(modifier = Modifier.height(16.dp))
             ChartSection(onNavigate,isLandscape =false)
+            Log.d("Daily","$dailyPlayList");
+
+            if (dailyPlayList.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(24.dp))
+                DailyPlaylistCard(dailyPlayList) {
+                    
+                     onNavigate("album/GLOBAL?isDailyPlaylist=true")
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+
             Text(
                 text = "New Songs For You",
                 fontSize = 20.sp,
@@ -139,6 +161,64 @@ fun HomeScreenContent(
         Spacer(modifier = Modifier.height(if (isLandscape) 8.dp else 16.dp)) // Reduce bottom spacer
     }
 }
+
+@Composable
+fun DailyPlaylistSection(dailyPlayList: List<Songs>, onNavigate: (String) -> Unit){
+    Column {
+        Text("Daily Playlist", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 20.sp)
+        LazyRow {
+            items(dailyPlayList) { song ->
+                SongItemRecommendedPortrait(song, onNavigate, isLandscape = false)
+            }
+        }
+    }
+}
+
+@Composable
+fun DailyPlaylistCard(
+    dailyPlaylist: List<Songs>,
+    onClick: () -> Unit
+) {
+    if (dailyPlaylist.isEmpty()) return
+
+    val firstSong = dailyPlaylist.first()
+    val artworkUri = firstSong.artwork?.let { Uri.parse(it) }
+    val context = LocalContext.current
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF232323))
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Image(
+                painter = rememberAsyncImagePainter(
+                    ImageRequest.Builder(context).data(data = artworkUri).apply { crossfade(true) }.build()
+                ),
+                contentDescription = "Daily Playlist Artwork",
+                modifier = Modifier
+                    .size(100.dp)
+                    .padding(12.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Crop
+            )
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Daily Playlist", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 22.sp)
+                Text("${dailyPlaylist.size} songs", color = Color.Gray, fontSize = 14.sp)
+            }
+            IconButton(onClick = onClick) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(36.dp))
+            }
+        }
+    }
+}
+
+
 @Composable
 fun TopBar(isLandscape: Boolean = false) {
     Row(

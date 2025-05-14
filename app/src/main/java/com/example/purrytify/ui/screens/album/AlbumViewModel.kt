@@ -5,28 +5,32 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.purrytify.data.auth.AuthRepository
+import com.example.purrytify.data.repository.DailyPlaylistRepository
 import com.example.purrytify.data.repository.OnlineSongRepository
 import com.example.purrytify.data.model.OnlineSongResponse
-import com.example.purrytify.db.AppDatabase // Assuming this is your Room database class
+import com.example.purrytify.data.repository.RecommendationRepository
+import com.example.purrytify.db.AppDatabase
+import com.example.purrytify.utils.DateUtils
 import com.example.purrytify.utils.DownloadUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.util.Date
 import java.util.Locale
 
 class AlbumViewModel(application: Application) : AndroidViewModel(application) {
     private val onlineSongRepository = OnlineSongRepository.getInstance(application)
-    private val songsDao = AppDatabase.getDatabase(application).songsDao() // Get the SongsDao instance
+    private val songsDao = AppDatabase.getDatabase(application).songsDao()
+    private val usersDao = AppDatabase.getDatabase(application).usersDao()
     private val tag = "AlbumViewModel"
     private val authRepository = AuthRepository.getInstance(application)
-    private val context = application.applicationContext // Get application context
+    private val context = application.applicationContext
     private val _downloadProgress = MutableStateFlow<Pair<Int, Int>?>(null) // Pair<DownloadedCount, TotalCount>
     val downloadProgress: StateFlow<Pair<Int, Int>?> = _downloadProgress
 
 
     private val _songs = MutableStateFlow<List<OnlineSongResponse>>(emptyList())
     val songs: StateFlow<List<OnlineSongResponse>> = _songs
-
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
 
@@ -35,6 +39,18 @@ class AlbumViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _onlineSongs = MutableStateFlow<List<OnlineSongResponse>>(emptyList())
     val onlineSongs: StateFlow<List<OnlineSongResponse>> = _onlineSongs
+    
+    private val dailyPlaylistRepository = DailyPlaylistRepository.getInstance(
+        getApplication(),
+        songsDao,
+        usersDao,
+        RecommendationRepository(
+            songsDao,
+            getApplication(),
+            onlineSongRepository
+        ),
+        authRepository
+    )
 
     fun getCurrentUserid(): Int {
         return authRepository.currentUserId!!
@@ -67,25 +83,53 @@ class AlbumViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun downloadSongs(region: String, userId: Int) {
+    fun loadDailyPlaylist(region: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+
+            try {
+                val userId = getCurrentUserid()
+                
+                // Get daily playlist from repository
+                val dailyPlaylistSongs = dailyPlaylistRepository.getDailyPlaylist(region = region)
+                
+                val onlineSongs = dailyPlaylistRepository.convertToOnlineSongResponse(dailyPlaylistSongs, region)
+                
+                _songs.value = onlineSongs
+                
+                _isLoading.value = false
+            } catch (e: Exception) {
+                _errorMessage.value = "Failed to load daily playlist: ${e.message}"
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun downloadSongs(region: String, userId: Int, isDailyPlaylist: Boolean = false) {
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
             try {
-                val fetchedSongs = if (region.uppercase(Locale.ROOT) == "GLOBAL") {
+                // Use current songs value if it's a daily playlist, otherwise fetch from repository
+                val fetchedSongs = if (isDailyPlaylist) {
+                    _songs.value
+                } else if (region.uppercase(Locale.ROOT) == "GLOBAL") {
                     onlineSongRepository.getTopGlobalSongs()
                 } else {
                     onlineSongRepository.getTopCountrySongs(region.uppercase(Locale.ROOT))
                 }
-                if (fetchedSongs != null) {
+                
+                if (fetchedSongs != null && fetchedSongs.isNotEmpty()) {
                     _onlineSongs.value = fetchedSongs
-                    Log.d(tag, "Loaded online Songs: ${_onlineSongs.value}")
+                    Log.d(tag, "Loaded ${if (isDailyPlaylist) "daily playlist" else "online"} songs: ${fetchedSongs.size}")
                     insertSongsIntoDb(fetchedSongs, userId)
                 } else {
-                    Log.e(tag, "Failed to load online songs: response was null")
+                    Log.e(tag, "Failed to load songs: response was null or empty")
+                    _errorMessage.value = "Failed to download songs: No songs found"
                 }
             } catch (e: Exception) {
-                Log.e(tag, "Failed to load online songs: ${e.message}", e)
+                Log.e(tag, "Failed to load songs: ${e.message}", e)
                 _errorMessage.value = "Failed to download songs: ${e.localizedMessage}"
             } finally {
                 _isLoading.value = false
