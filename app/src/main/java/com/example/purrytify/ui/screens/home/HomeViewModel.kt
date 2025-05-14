@@ -3,12 +3,19 @@ package com.example.purrytify.ui.screens.home
 import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.purrytify.data.auth.AuthRepository
+import com.example.purrytify.data.repository.OnlineSongRepository
+import com.example.purrytify.data.repository.RecommendationRepository
 import com.example.purrytify.db.AppDatabase
 import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.db.relationship.RecentlyPlayedWithSong
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.launch
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -49,5 +56,21 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         Log.d(Tag, "User ID: $userId, Recently played songs: $recentlyPlayedSongs")
 
 
+    }
+
+    private val recommendationRepository = RecommendationRepository(
+        AppDatabase.getDatabase(application).songsDao(),
+        application,
+        OnlineSongRepository.getInstance(application)
+    )
+
+    private val _dailyPlaylist = MutableStateFlow<List<Songs>>(emptyList())
+    val dailyPlaylist: StateFlow<List<Songs>> = _dailyPlaylist
+
+    fun loadDailyPlaylist(){
+        viewModelScope.launch {
+            val userId = authRepository.currentUserId ?: return@launch
+            _dailyPlaylist.value = recommendationRepository.getDailyPlaylist(userId)
+        }
     }
 }

@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -24,7 +25,9 @@ import com.example.purrytify.ui.components.LeftNavigationBar
 import com.example.purrytify.ui.components.MiniPlayer
 import com.example.purrytify.ui.screens.album.AlbumScreen
 import com.example.purrytify.ui.screens.home.HomeScreen
+import com.example.purrytify.ui.screens.home.HomeViewModel
 import com.example.purrytify.ui.screens.library.LibraryScreen
+import com.example.purrytify.ui.screens.playlist.DailyPlaylistDetailScreen
 import com.example.purrytify.ui.screens.profile.EditProfileScreen
 import com.example.purrytify.ui.screens.profile.MapsPickerScreen
 import com.example.purrytify.ui.screens.profile.ProfileScreen
@@ -255,6 +258,16 @@ fun AppNavigation(
                             skipToPrevious = songDetailViewModel::skipPrevious
                         )
                     }
+                }
+
+                composable("albumDetails/dailyPlaylist") {
+                    val homeViewModel = viewModel<HomeViewModel>()
+                    val dailyPlaylist by homeViewModel.dailyPlaylist.collectAsState()
+                    DailyPlaylistDetailScreen(
+                        dailyPlaylist = dailyPlaylist,
+                        navController = navController,
+                        mainViewModel = mainViewModel
+                    )
                 }
             }
         }
