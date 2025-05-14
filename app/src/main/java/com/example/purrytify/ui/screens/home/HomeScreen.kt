@@ -51,8 +51,11 @@ fun HomeScreen(
     Log.d("Init home new songs: ", "$newAddedSongs")
     Log.d("USER ID INIT: ", "${homeViewModel.userId}")
 
-    LaunchedEffect(Unit) {
-        homeViewModel.loadDailyPlaylist()
+    
+    LaunchedEffect(dailyPlayList.isEmpty()) {
+        if (dailyPlayList.isEmpty()) {
+            homeViewModel.loadDailyPlaylist()
+        }
     }
 
     Scaffold { paddingValues ->

@@ -7,6 +7,7 @@ import androidx.room.Update
 import androidx.room.Delete
 import com.example.purrytify.db.entity.Users
 import kotlinx.coroutines.flow.Flow
+import java.util.Date
 
 @Dao
 interface UsersDao {
@@ -33,5 +34,10 @@ interface UsersDao {
     @Query("UPDATE users SET totalplayed = totalplayed + 1 WHERE id = :userId")
     suspend fun incrementTotalPlayed(userId: Int)
 
+    @Query("UPDATE users SET dailyPlaylistLastFetched = :date WHERE id = :userId")
+    suspend fun updateDailyPlaylistLastFetched(userId: Int, date: Date)
+
+    @Query("SELECT dailyPlaylistLastFetched FROM users WHERE id = :userId")
+    suspend fun getDailyPlaylistLastFetchedDate(userId: Int): Date?
 
 }

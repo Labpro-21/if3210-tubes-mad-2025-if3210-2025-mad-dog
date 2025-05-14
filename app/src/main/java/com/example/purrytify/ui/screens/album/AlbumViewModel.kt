@@ -5,29 +5,32 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.purrytify.data.auth.AuthRepository
+import com.example.purrytify.data.repository.DailyPlaylistRepository
 import com.example.purrytify.data.repository.OnlineSongRepository
 import com.example.purrytify.data.model.OnlineSongResponse
 import com.example.purrytify.data.repository.RecommendationRepository
-import com.example.purrytify.db.AppDatabase // Assuming this is your Room database class
+import com.example.purrytify.db.AppDatabase
+import com.example.purrytify.utils.DateUtils
 import com.example.purrytify.utils.DownloadUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.util.Date
 import java.util.Locale
 
 class AlbumViewModel(application: Application) : AndroidViewModel(application) {
     private val onlineSongRepository = OnlineSongRepository.getInstance(application)
-    private val songsDao = AppDatabase.getDatabase(application).songsDao() // Get the SongsDao instance
+    private val songsDao = AppDatabase.getDatabase(application).songsDao()
+    private val usersDao = AppDatabase.getDatabase(application).usersDao()
     private val tag = "AlbumViewModel"
     private val authRepository = AuthRepository.getInstance(application)
-    private val context = application.applicationContext // Get application context
+    private val context = application.applicationContext
     private val _downloadProgress = MutableStateFlow<Pair<Int, Int>?>(null) // Pair<DownloadedCount, TotalCount>
     val downloadProgress: StateFlow<Pair<Int, Int>?> = _downloadProgress
 
 
     private val _songs = MutableStateFlow<List<OnlineSongResponse>>(emptyList())
     val songs: StateFlow<List<OnlineSongResponse>> = _songs
-
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
 
@@ -36,6 +39,18 @@ class AlbumViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _onlineSongs = MutableStateFlow<List<OnlineSongResponse>>(emptyList())
     val onlineSongs: StateFlow<List<OnlineSongResponse>> = _onlineSongs
+    
+    private val dailyPlaylistRepository = DailyPlaylistRepository.getInstance(
+        getApplication(),
+        songsDao,
+        usersDao,
+        RecommendationRepository(
+            songsDao,
+            getApplication(),
+            onlineSongRepository
+        ),
+        authRepository
+    )
 
     fun getCurrentUserid(): Int {
         return authRepository.currentUserId!!
@@ -76,31 +91,13 @@ class AlbumViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val userId = getCurrentUserid()
                 
-                val recommendationRepository = RecommendationRepository(
-                    songsDao,
-                    getApplication(),
-                    onlineSongRepository
-                )
-
+                // Get daily playlist from repository
+                val dailyPlaylistSongs = dailyPlaylistRepository.getDailyPlaylist(region = region)
                 
-                val dailyPlaylistSongs = recommendationRepository.getDailyPlaylist(userId, region)
-
-                val onlineSongs = dailyPlaylistSongs.mapIndexed { index, song ->
-                    OnlineSongResponse(
-                        id = song.id ?: 0,
-                        title = song.name ?: "",
-                        artist = song.artist ?: "",
-                        duration = song.duration?.toString() ?: "0:00",
-                        url = song.filePath ?: "",
-                        artwork = song.artwork ?: "",
-                        country = region, 
-                        createdAt = "",
-                        updatedAt = "",
-                        rank = index + 1
-                    )
-                }
-
+                val onlineSongs = dailyPlaylistRepository.convertToOnlineSongResponse(dailyPlaylistSongs, region)
+                
                 _songs.value = onlineSongs
+                
                 _isLoading.value = false
             } catch (e: Exception) {
                 _errorMessage.value = "Failed to load daily playlist: ${e.message}"
