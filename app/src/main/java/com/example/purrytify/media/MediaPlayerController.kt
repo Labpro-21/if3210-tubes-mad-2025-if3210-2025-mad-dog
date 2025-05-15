@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.AudioAttributes
@@ -20,6 +21,7 @@ import android.support.v4.media.session.PlaybackStateCompat
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import coil.ImageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
@@ -31,6 +33,7 @@ import com.example.purrytify.db.AppDatabase
 import com.example.purrytify.db.dao.ListeningActivityDao
 import com.example.purrytify.db.entity.ListeningActivity
 import com.example.purrytify.db.entity.Songs
+import com.example.purrytify.media.MediaNotificationReceiver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,16 +44,19 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Date
 
-class MediaPlayerController private constructor(private val context: Context) {    companion object {
+class MediaPlayerController private constructor(private val context: Context) {
+    companion object {
         private const val NOTIFICATION_ID = 1
         private const val CHANNEL_ID = "media_playback_channel"
         private var instance: MediaPlayerController? = null
-        private const val TAG = "MediaPlayerController"
 
+
+        private const val TAG = "MediaPlayerController"
         const val ACTION_PLAY = "com.example.purrytify.ACTION_PLAY"
         const val ACTION_PAUSE = "com.example.purrytify.ACTION_PAUSE"
         const val ACTION_NEXT = "com.example.purrytify.ACTION_NEXT"
         const val ACTION_PREVIOUS = "com.example.purrytify.ACTION_PREVIOUS"
+
 
         fun getInstance(context: Context): MediaPlayerController {
             return instance ?: synchronized(this) {
@@ -97,6 +103,20 @@ class MediaPlayerController private constructor(private val context: Context) { 
         listenActivityDao = AppDatabase.getDatabase(context).listeningCapsuleDao()
         listenActivityRepository = ListeningActivityRepository.getInstance(listenActivityDao)
         authRepository = AuthRepository.getInstance(context)
+
+        val intentFilter = IntentFilter().apply {
+            addAction(ACTION_PLAY)
+            addAction(ACTION_PAUSE)
+            addAction(ACTION_NEXT)
+            addAction(ACTION_PREVIOUS)
+        }
+
+        ContextCompat.registerReceiver(
+            context,
+            MediaNotificationReceiver(),
+            intentFilter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
 
 
         setupMediaPlayer()
@@ -179,28 +199,44 @@ class MediaPlayerController private constructor(private val context: Context) { 
         mediaSession = MediaSessionCompat(context, "PurrytifyMediaSession")
         mediaSession.setCallback(object : MediaSessionCompat.Callback() {
             override fun onPlay() {
+                Log.d(TAG, "MediaSession.onPlay()")
                 play()
             }
 
             override fun onPause() {
+                Log.d(TAG, "MediaSession.onPause()")
                 pause()
             }
 
             override fun onSkipToNext() {
-                val currentSong = _currentSong.value ?: return
-                skipToNextCallback?.invoke(currentSong.id)
+                Log.d(TAG, "MediaSession.onSkipToNext()")
+                val currentSong = _currentSong.value
+                if (currentSong != null) {
+                    Log.d(TAG, "Invoking skipToNextCallback for song ID: ${currentSong.id}")
+                    skipToNextCallback?.invoke(currentSong.id)
+                } else {
+                    Log.w(TAG, "Cannot skip to next: currentSong is null")
+                }
             }
 
             override fun onSkipToPrevious() {
-                val currentSong = _currentSong.value ?: return
-                skipToPreviousCallback?.invoke(currentSong.id)
+                Log.d(TAG, "MediaSession.onSkipToPrevious()")
+                val currentSong = _currentSong.value
+                if (currentSong != null) {
+                    Log.d(TAG, "Invoking skipToPreviousCallback for song ID: ${currentSong.id}")
+                    skipToPreviousCallback?.invoke(currentSong.id)
+                } else {
+                    Log.w(TAG, "Cannot skip to previous: currentSong is null")
+                }
             }
 
             override fun onStop() {
+                Log.d(TAG, "MediaSession.onStop()")
                 stop()
             }
 
             override fun onSeekTo(pos: Long) {
+                Log.d(TAG, "MediaSession.onSeekTo($pos)")
                 seekTo(pos.toInt())
             }
         })
@@ -480,33 +516,42 @@ class MediaPlayerController private constructor(private val context: Context) { 
         val bitmap = artworkUri?.let { getBitmapFromUri(it) }
             ?: BitmapFactory.decodeResource(context.resources, R.drawable.music_placeholder)
 
-        val playPauseAction = if (_isPlaying.value) {
-            NotificationCompat.Action(
-                R.drawable.ic_pause, "Pause",
-                getPendingIntent(ACTION_PAUSE)
-            )
-        } else {
-            NotificationCompat.Action(
-                R.drawable.ic_play, "Play",
-                getPendingIntent(ACTION_PLAY)
-            )
-        }
+        val previousPendingIntent = PendingIntent.getBroadcast(
+            context,
+            1,  
+            Intent(ACTION_PREVIOUS).setClass(context, MediaNotificationReceiver::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        
+        val playPausePendingIntent = PendingIntent.getBroadcast(
+            context,
+            2,  
+            Intent(if (_isPlaying.value) ACTION_PAUSE else ACTION_PLAY)
+                .setClass(context, MediaNotificationReceiver::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        
+        val nextPendingIntent = PendingIntent.getBroadcast(
+            context,
+            3,  
+            Intent(ACTION_NEXT).setClass(context, MediaNotificationReceiver::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
 
+ 
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_music_note)
             .setLargeIcon(bitmap)
             .setContentTitle(song.name)
             .setContentText(song.artist)
             .setContentIntent(pendingIntent)
+            .addAction(R.drawable.ic_skip_previous, "Previous", previousPendingIntent)
             .addAction(
-                R.drawable.ic_skip_previous, "Previous",
-                getPendingIntent(ACTION_PREVIOUS)
+                if (_isPlaying.value) R.drawable.ic_pause else R.drawable.ic_play,
+                if (_isPlaying.value) "Pause" else "Play",
+                playPausePendingIntent
             )
-            .addAction(playPauseAction)
-            .addAction(
-                R.drawable.ic_skip_next, "Next",
-                getPendingIntent(ACTION_NEXT)
-            )
+            .addAction(R.drawable.ic_skip_next, "Next", nextPendingIntent)
             .setStyle(
                 androidx.media.app.NotificationCompat.MediaStyle()
                     .setMediaSession(mediaSession.sessionToken)
@@ -523,8 +568,11 @@ class MediaPlayerController private constructor(private val context: Context) { 
 
     private fun getPendingIntent(action: String): PendingIntent {
         val intent = Intent(action).apply {
-            setPackage(context.packageName)
+            setClass(context, MediaNotificationReceiver::class.java)
         }
+
+        Log.d(TAG, "Creating PendingIntent for action: $action")
+
         return PendingIntent.getBroadcast(
             context,
             action.hashCode(),

@@ -14,6 +14,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.data.auth.AuthState
+import com.example.purrytify.data.repository.OnlineSongRepository
+import com.example.purrytify.data.repository.RecommendationRepository
 import com.example.purrytify.db.AppDatabase
 import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.media.MediaPlaybackService
@@ -21,6 +23,7 @@ import com.example.purrytify.media.MediaPlayerController
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -38,6 +41,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _currentSong = MutableStateFlow<Songs?>(null)
     val currentSong: StateFlow<Songs?> = _currentSong
+
+    private val _currentSongSource = MutableStateFlow<String>("regular")
+    val currentSongSource: StateFlow<String> = _currentSongSource.asStateFlow()
+
+
+    private val _currentDailyPlaylist = MutableStateFlow<List<Songs>>(emptyList())
 
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying
@@ -78,19 +87,97 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (serviceBound && mediaController != null) {
             mediaController?.skipToNextCallback = { songId ->
                 Log.d(TAG, "MediaController requesting skip to next for song: $songId")
-                val isOnline = _isOnlineSong.value
-                val region = "GLOBAL"
-                skipToNextNavigationCallback?.invoke(songId, isOnline, region) { nextSongId ->
-                    Log.d(TAG, "Would navigate to next song: $nextSongId")
+                viewModelScope.launch {
+                    try {
+                        val isOnline = _isOnlineSong.value
+                        val region = "GLOBAL"
+                        
+                        // Periksa apakah lagu saat ini berasal dari daily playlist
+                        if (_currentSongSource.value == "daily" && _currentDailyPlaylist.value.isNotEmpty()) {
+                            // Cari lagu dalam daily playlist
+                            val currentIndex = _currentDailyPlaylist.value.indexOfFirst { it.id == songId }
+                            if (currentIndex != -1) {
+                                // Hitung next index dengan wraparound
+                                val nextIndex = (currentIndex + 1) % _currentDailyPlaylist.value.size
+                                val nextSong = _currentDailyPlaylist.value[nextIndex]
+                                
+                                Log.d(TAG, "Daily playlist navigation: Next song is ${nextSong.name} (ID: ${nextSong.id})")
+                                
+                                // Putar lagu berikutnya dari daily playlist
+                                playSong(nextSong)
+                                return@launch
+                            }
+                        }
+                        
+                        // Jika bukan dari daily playlist atau tidak ditemukan, gunakan navigasi standar
+                        skipToNextNavigationCallback?.invoke(songId, isOnline, region) { nextSongId ->
+                            Log.d(TAG, "Will navigate to next song: $nextSongId")
+                            
+                            viewModelScope.launch {
+                                try {
+                                    val nextSong = findSongById(nextSongId)
+                                    if (nextSong != null) {
+                                        playSong(nextSong)
+                                        Log.d(TAG, "Playing next song: ${nextSong.name}")
+                                    } else {
+                                        Log.e(TAG, "Could not find song with ID: $nextSongId")
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Error playing next song: ${e.message}", e)
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error in skipToNextCallback: ${e.message}", e)
+                    }
                 }
             }
-
+            
             mediaController?.skipToPreviousCallback = { songId ->
                 Log.d(TAG, "MediaController requesting skip to previous for song: $songId")
-                val isOnline = _isOnlineSong.value
-                val region = "GLOBAL"
-                skipToPreviousNavigationCallback?.invoke(songId, isOnline, region) { prevSongId ->
-                    Log.d(TAG, "Would navigate to previous song: $prevSongId")
+                viewModelScope.launch {
+                    try {
+                        val isOnline = _isOnlineSong.value
+                        val region = "GLOBAL"
+                        
+                        // Periksa apakah lagu saat ini berasal dari daily playlist
+                        if (_currentSongSource.value == "daily" && _currentDailyPlaylist.value.isNotEmpty()) {
+                            // Cari lagu dalam daily playlist
+                            val currentIndex = _currentDailyPlaylist.value.indexOfFirst { it.id == songId }
+                            if (currentIndex != -1) {
+                                // Hitung previous index dengan wraparound
+                                val prevIndex = if (currentIndex > 0) currentIndex - 1 else _currentDailyPlaylist.value.size - 1
+                                val prevSong = _currentDailyPlaylist.value[prevIndex]
+                                
+                                Log.d(TAG, "Daily playlist navigation: Previous song is ${prevSong.name} (ID: ${prevSong.id})")
+                                
+                                // Putar lagu sebelumnya dari daily playlist
+                                playSong(prevSong)
+                                return@launch
+                            }
+                        }
+                        
+                        // Jika bukan dari daily playlist atau tidak ditemukan, gunakan navigasi standar
+                        skipToPreviousNavigationCallback?.invoke(songId, isOnline, region) { prevSongId ->
+                            Log.d(TAG, "Will navigate to previous song: $prevSongId")
+                            
+                            viewModelScope.launch {
+                                try {
+                                    val prevSong = findSongById(prevSongId)
+                                    if (prevSong != null) {
+                                        playSong(prevSong)
+                                        Log.d(TAG, "Playing previous song: ${prevSong.name}")
+                                    } else {
+                                        Log.e(TAG, "Could not find song with ID: $prevSongId")
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Error playing previous song: ${e.message}", e)
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error in skipToPreviousCallback: ${e.message}", e)
+                    }
                 }
             }
         }
@@ -153,6 +240,117 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         context.bindService(serviceIntent, serviceConnection!!, Context.BIND_AUTO_CREATE)
     }
 
+    private suspend fun findSongById(songId: Int): Songs? {
+        Log.d(TAG, "Finding song with ID: $songId, isOnlineSong: ${_isOnlineSong.value}")
+        
+        // First try to find in local database
+        val db = AppDatabase.getDatabase(getApplication())
+        val localSong = db.songsDao().getSongById(songId)
+        
+        if (localSong != null) {
+            Log.d(TAG, "Found song in local database: ${localSong.name}")
+            return localSong
+        }
+        
+        // If song not found locally and we're in online mode, try to fetch from network
+        if (_isOnlineSong.value) {
+            Log.d(TAG, "Song not found locally, searching online")
+            val onlineSongRepository = OnlineSongRepository.getInstance(getApplication())
+            
+            // Try to determine the region from the current song
+            val currentSong = mediaController?.currentSong?.value
+            var region = "GLOBAL" // Default region
+            
+            if (currentSong != null && currentSong.description.isNotEmpty()) {
+                // If the current song has a region specified in its description, use that
+                region = currentSong.description
+                Log.d(TAG, "Using region from current song: $region")
+            }
+            
+            // First try to fetch songs from the specific region
+            var onlineSongs = if (region != "GLOBAL") {
+                onlineSongRepository.getTopCountrySongs(region)
+            } else {
+                onlineSongRepository.getTopGlobalSongs()
+            }
+            
+            // If no songs found in specific region, fall back to global
+            if (onlineSongs.isNullOrEmpty() && region != "GLOBAL") {
+                Log.d(TAG, "No songs found in region $region, falling back to global")
+                onlineSongs = onlineSongRepository.getTopGlobalSongs()
+            }
+            
+            if (onlineSongs != null) {
+                // Find the specific song in the fetched list
+                val onlineSong = onlineSongs.find { it.id == songId }
+                if (onlineSong != null) {
+                    Log.d(TAG, "Found song online: ${onlineSong.title} in region: ${onlineSong.country ?: "GLOBAL"}")
+                    
+                    // Convert online song to Songs entity
+                    return Songs(
+                        id = onlineSong.id,
+                        name = onlineSong.title,
+                        artist = onlineSong.artist,
+                        description = onlineSong.country ?: "",
+                        filePath = onlineSong.url,
+                        artwork = onlineSong.artwork,
+                        duration = com.example.purrytify.utils.MediaUtils.parseDuration(onlineSong.duration),
+                        isFavorite = false,
+                        userId = authRepository.currentUserId ?: 0,
+                        uploadDate = java.util.Date()
+                    )
+                }
+            }
+            
+            // If the song was not found in the current region, try all other regions
+            Log.d(TAG, "Song not found in region $region, checking all regions")
+            val allRegions = listOf("GLOBAL", "ID", "US", "KR", "JP") // Add all supported regions
+            for (otherRegion in allRegions) {
+                if (otherRegion == region) continue // Skip region we already checked
+                
+                Log.d(TAG, "Checking region: $otherRegion")
+                val regionSongs = if (otherRegion == "GLOBAL") {
+                    onlineSongRepository.getTopGlobalSongs()
+                } else {
+                    onlineSongRepository.getTopCountrySongs(otherRegion)
+                }
+                
+                if (regionSongs != null) {
+                    val regionSong = regionSongs.find { it.id == songId }
+                    if (regionSong != null) {
+                        Log.d(TAG, "Found song online: ${regionSong.title} in region: ${regionSong.country ?: "GLOBAL"}")
+                        
+                        // Convert online song to Songs entity
+                        return Songs(
+                            id = regionSong.id,
+                            name = regionSong.title,
+                            artist = regionSong.artist,
+                            description = regionSong.country ?: "",
+                            filePath = regionSong.url,
+                            artwork = regionSong.artwork,
+                            duration = com.example.purrytify.utils.MediaUtils.parseDuration(regionSong.duration),
+                            isFavorite = false,
+                            userId = authRepository.currentUserId ?: 0,
+                            uploadDate = java.util.Date()
+                        )
+                    }
+                }
+            }
+        }
+        
+        // If we're in a playlist, check if the song is in the current playlist
+        if (mediaController?.playlist?.value?.isNotEmpty() == true) {
+            val playlistSong = mediaController?.playlist?.value?.find { it.id == songId }
+            if (playlistSong != null) {
+                Log.d(TAG, "Found song in current playlist: ${playlistSong.name}")
+                return playlistSong
+            }
+        }
+        
+        Log.w(TAG, "Song with ID $songId not found in any source")
+        return null
+    }
+
     private fun observeMediaControllerStates() {
         viewModelScope.launch {
             mediaController?.isPlaying?.collectLatest { isPlaying ->
@@ -201,6 +399,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             mediaController?.setIsOnlineSong(isOnline)
         }
     }
+
+    
 
 
     private fun checkLoginStatus() {
@@ -418,6 +618,65 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         } else {
             Log.d(TAG, "Skip to previous requested but no navigation callback is registered")
+        }
+    }
+
+    fun playDailyPlaylist(userId: Int, startIndex: Int = 0) {
+        viewModelScope.launch {
+            try {
+                val db = AppDatabase.getDatabase(getApplication())
+                val recommendationRepository = RecommendationRepository(
+                    db.songsDao(),
+                    getApplication(),
+                    OnlineSongRepository.getInstance(getApplication())
+                )
+                
+                val dailyPlaylist = recommendationRepository.getDailyPlaylist(userId)
+                if (dailyPlaylist.isNotEmpty()) {
+                    _currentDailyPlaylist.value = dailyPlaylist
+                    
+                    _currentSongSource.value = "daily"
+                    
+                    val startSong = dailyPlaylist.getOrElse(startIndex) { dailyPlaylist.first() }
+                    
+                    playSong(startSong)
+                    
+                    Log.d(TAG, "Playing daily playlist, starting with: ${startSong.name}")
+                } else {
+                    Log.w(TAG, "Daily playlist is empty")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error playing daily playlist: ${e.message}", e)
+            }
+        }
+    }
+
+    fun playDailySong(song: Songs) {
+        viewModelScope.launch {
+            try {
+                val userId = authRepository.currentUserId ?: return@launch
+                
+                val db = AppDatabase.getDatabase(getApplication())
+                val recommendationRepository = RecommendationRepository(
+                    db.songsDao(),
+                    getApplication(),
+                    OnlineSongRepository.getInstance(getApplication())
+                )
+                
+                val dailyPlaylist = recommendationRepository.getDailyPlaylist(userId)
+                
+                _currentDailyPlaylist.value = dailyPlaylist
+                
+                _currentSongSource.value = "daily"
+                
+                playSong(song)
+                
+                Log.d(TAG, "Playing song from daily playlist: ${song.name}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error playing song from daily playlist: ${e.message}", e)
+                _currentSongSource.value = "regular"
+                playSong(song)
+            }
         }
     }
 }
