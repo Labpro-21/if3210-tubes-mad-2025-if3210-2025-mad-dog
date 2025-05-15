@@ -102,6 +102,15 @@ fun SongDetailScreen(
             viewModel.resetUpdateSuccessful()
         }
     }
+    LaunchedEffect(uiState) {
+        // Auto-play lagu
+        if (uiState is SongDetailViewModel.SongDetailUiState.Success) {
+            val song = (uiState as SongDetailViewModel.SongDetailUiState.Success).song
+            mainViewModel.setIsOnlineSong(isOnline)
+            mainViewModel.playSong(song)
+            viewModel.insertRecentlyPlayed(song, isOnline)
+        }
+    }
 
     when (uiState) {
         SongDetailViewModel.SongDetailUiState.Loading -> {
