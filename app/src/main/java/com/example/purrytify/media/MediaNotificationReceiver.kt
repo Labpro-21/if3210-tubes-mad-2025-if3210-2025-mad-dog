@@ -7,25 +7,40 @@ import android.util.Log
 
 class MediaNotificationReceiver : BroadcastReceiver() {
     
-    companion object {
-        private const val TAG = "MediaNotificationReceiver"
-    }
+    private val TAG = "MediaNotificationReceiver"
     
     override fun onReceive(context: Context, intent: Intent) {
+        val action = intent.action
+        Log.d(TAG, "Received action: $action")
+        
         val mediaController = MediaPlayerController.getInstance(context)
         
-        Log.d(TAG, "Received action: ${intent.action}")
-        
-        when (intent.action) {
-            MediaPlayerController.ACTION_PLAY -> mediaController.play()
-            MediaPlayerController.ACTION_PAUSE -> mediaController.pause()
+        when (action) {
+            MediaPlayerController.ACTION_PLAY -> {
+                Log.d(TAG, "Processing PLAY action")
+                mediaController.play()
+            }
+            MediaPlayerController.ACTION_PAUSE -> {
+                Log.d(TAG, "Processing PAUSE action")
+                mediaController.pause()
+            }
             MediaPlayerController.ACTION_NEXT -> {
-                val currentSong = mediaController.currentSong.value ?: return
-                mediaController.skipToNextCallback?.invoke(currentSong.id)
+                Log.d(TAG, "Processing NEXT action")
+                val currentSong = mediaController.currentSong.value
+                if (currentSong != null) {
+                    // Call the callback to handle navigation in the ViewModel
+                    mediaController.skipToNextCallback?.invoke(currentSong.id)
+                    Log.d(TAG, "Next button pressed for song: ${currentSong.id}")
+                }
             }
             MediaPlayerController.ACTION_PREVIOUS -> {
-                val currentSong = mediaController.currentSong.value ?: return
-                mediaController.skipToPreviousCallback?.invoke(currentSong.id)
+                Log.d(TAG, "Processing PREVIOUS action")
+                val currentSong = mediaController.currentSong.value
+                if (currentSong != null) {
+                    // Call the callback to handle navigation in the ViewModel
+                    mediaController.skipToPreviousCallback?.invoke(currentSong.id)
+                    Log.d(TAG, "Previous button pressed for song: ${currentSong.id}")
+                }
             }
         }
     }

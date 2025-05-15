@@ -34,7 +34,6 @@ fun DailyPlaylistDetailScreen(
                     if (dailyPlaylist.isNotEmpty()) {
                         mainViewModel.setIsOnlineSong(false)
                         mainViewModel.playSong(dailyPlaylist.first())
-                        // Optionally, set playlist in your media controller if supported
                     }
                 },
                 enabled = dailyPlaylist.isNotEmpty()
@@ -51,7 +50,7 @@ fun DailyPlaylistDetailScreen(
                         .fillMaxWidth()
                         .clickable {
                             mainViewModel.setIsOnlineSong(false)
-                            mainViewModel.playSong(song)
+                            mainViewModel.playDailySong(song)
                             navController.navigate("songDetail/${song.id}")
                         }
                         .padding(vertical = 8.dp),
