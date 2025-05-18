@@ -38,9 +38,10 @@ interface ListeningActivityDao {
         FROM listening_activity
         WHERE userId = :userId
         AND strftime('%Y-%m', startTime / 1000, 'unixepoch', 'localtime') = strftime('%Y-%m', 'now', 'localtime')
-        AND completed = 1
+        
         """
     )
+    //AND completed = 1
     fun getTotalListeningTimeThisMonth(userId: Int): Long
 
     // Changed return type to TopArtist data class instead of String
@@ -166,4 +167,76 @@ interface ListeningActivityDao {
         val listeningDayStreak: Int,
         val monthYear: String // Added property for month and year
     )
+
+    // Data class to hold daily listening statistics
+    data class DailyListeningStats(
+        val date: String,  // Format: YYYY-MM-DD
+        val totalMinutes: Double,  // Duration in minutes
+    )
+
+    @Query("""
+        SELECT 
+            DATE(startTime / 1000, 'unixepoch', 'localtime') as date,
+            ROUND(CAST(SUM(duration) AS FLOAT) / 60000.0, 2) as totalMinutes
+        FROM listening_activity
+        WHERE userId = :userId
+        
+        AND startTime >= strftime('%s000', 'now', '-30 days')
+        AND startTime <= strftime('%s000', 'now')
+        GROUP BY DATE(startTime / 1000, 'unixepoch', 'localtime')
+        ORDER BY date ASC
+    """)
+    //AND completed = 1
+    suspend fun getDailyListeningStatsLastMonth(userId: Int): List<DailyListeningStats>
+
+    // Data class for monthly played songs
+    data class MonthlyPlayedSong(
+        val name: String,
+        val artist: String,
+        val artwork: String?,
+        val playCount: Int
+    )
+
+    @Query(
+        """
+        SELECT s.name, s.artist, s.artwork, COUNT(la.songId) AS playCount
+        FROM listening_activity la
+        JOIN songs s ON la.songId = s.id
+        WHERE la.userId = :userId
+        AND strftime('%Y-%m', la.startTime / 1000, 'unixepoch', 'localtime') = strftime('%Y-%m', 'now', 'localtime')
+        AND la.completed = 1
+        GROUP BY s.id, s.name, s.artist, s.artwork
+        ORDER BY playCount DESC
+        """
+    )
+    suspend fun getMonthlyPlayedSongs(userId: Int): List<MonthlyPlayedSong>
+
+    // Data class for monthly artist statistics
+    data class MonthlyArtistStats(
+        val artist: String,
+        val playCount: Int,
+        val artwork: String?  // Random artwork from one of the artist's songs
+    )
+
+    @Query(
+        """
+        SELECT 
+            s.artist,
+            COUNT(DISTINCT la.id) as playCount,
+            (
+                SELECT artwork 
+                FROM songs s2 
+                WHERE s2.artist = s.artist 
+                LIMIT 1
+            ) as artwork
+        FROM listening_activity la
+        JOIN songs s ON la.songId = s.id
+        WHERE la.userId = :userId
+        AND strftime('%Y-%m', la.startTime / 1000, 'unixepoch', 'localtime') = strftime('%Y-%m', 'now', 'localtime')
+        AND la.completed = 1
+        GROUP BY s.artist
+        ORDER BY playCount DESC
+        """
+    )
+    suspend fun getMonthlyArtistsStats(userId: Int): List<MonthlyArtistStats>
 }

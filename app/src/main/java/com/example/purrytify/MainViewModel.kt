@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import com.example.purrytify.data.model.OnlineSongResponse
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -72,6 +73,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Navigation callbacks for media controller
     private var skipToNextNavigationCallback: ((Int, Boolean, String, (Int) -> Unit) -> Unit)? = null
     private var skipToPreviousNavigationCallback: ((Int, Boolean, String, (Int) -> Unit) -> Unit)? = null
+
+    // Add state to store online song sequences by region
+    private val _onlineSongSequences = MutableStateFlow<Map<String, List<Int>>>(emptyMap())
+    val onlineSongSequences: StateFlow<Map<String, List<Int>>> = _onlineSongSequences
 
     fun registerNavigationCallbacks(
         skipToNext: (Int, Boolean, String, (Int) -> Unit) -> Unit,
@@ -206,14 +211,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     onSkipToPrevious = { songId -> skipPrevious(songId) },
                     onPlaybackFinished = {
                         _isPlaying.value = false
-                        // Don't reset the current song here - we still want to show it in mini player
-                        // _currentSong.value = null
-                        _songFinished.value = true // Set songFinished to true
-                        // Instead, just reset the position and keep mini player active
+                        _songFinished.value = true
                         _currentPosition.value = 0
 
-                        // Mini player should remain active to show the completed song
-                        //_isMiniPlayerActive.value = false
                     }
                 )
 
@@ -338,7 +338,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         
-        // If we're in a playlist, check if the song is in the current playlist
         if (mediaController?.playlist?.value?.isNotEmpty() == true) {
             val playlistSong = mediaController?.playlist?.value?.find { it.id == songId }
             if (playlistSong != null) {
@@ -678,5 +677,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 playSong(song)
             }
         }
+    }
+
+    // Caching
+    fun cacheOnlineSongSequence(region: String, songs: List<OnlineSongResponse>) {
+        val songIds = songs.map { it.id }
+        val updatedSequences = _onlineSongSequences.value.toMutableMap()
+        updatedSequences[region] = songIds
+        _onlineSongSequences.value = updatedSequences
+    }
+    
+    // Caching
+    fun getOnlineSongSequence(region: String): List<Int> {
+        return _onlineSongSequences.value[region] ?: emptyList()
     }
 }

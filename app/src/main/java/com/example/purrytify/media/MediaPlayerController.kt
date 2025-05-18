@@ -144,7 +144,7 @@ class MediaPlayerController private constructor(private val context: Context) {
             updatePositionJob?.cancel()
             if (!isOnlineSong.value) {
                 Log.d(TAG,"Complete listening act!")
-                completeListeningActivity()
+                completeListeningActivity(isComplete = true)
             }
 
             // Update media session playback state to stopped
@@ -368,6 +368,7 @@ class MediaPlayerController private constructor(private val context: Context) {
 
         mediaSession.setPlaybackState(playbackState)
         updateNotification()
+        createListeningActivity(currentSong)
         updateCurrentPosition()
     }
 
@@ -391,10 +392,11 @@ class MediaPlayerController private constructor(private val context: Context) {
 
             mediaSession.setPlaybackState(playbackState)
             updateNotification()
+            completeListeningActivity(isComplete = false)
             updatePositionJob?.cancel()
         }
     }
-    private fun completeListeningActivity() {
+    private fun completeListeningActivity(isComplete: Boolean) {
         if (isOnlineSong.value) {
             Log.d(TAG,"completeListeningAct: Online! skip")
             return
@@ -409,7 +411,7 @@ class MediaPlayerController private constructor(private val context: Context) {
                     existingActivity?.let {
                         val endTime = Date()
                         val actualDuration = endTime.time - it.startTime.time
-                        val updatedActivity = it.copy(endTime = endTime, duration = actualDuration, completed = true)
+                        val updatedActivity = it.copy(endTime = endTime, duration = actualDuration, completed = isComplete)
                         listenActivityRepository.update(updatedActivity)
                         Log.d(TAG, "Completed listening activity ID: $id, Duration: $actualDuration ms")
                     } ?: run {
@@ -424,7 +426,7 @@ class MediaPlayerController private constructor(private val context: Context) {
     fun stop() {
         // Complete listening activity before stopping
         if (!isOnlineSong.value) {
-            completeListeningActivity()
+            completeListeningActivity(isComplete = false)
         }
         mediaPlayer.stop()
         _isPlaying.value = false
@@ -594,7 +596,7 @@ class MediaPlayerController private constructor(private val context: Context) {
     fun release() {
         // Complete any active listening activity
         if (!isOnlineSong.value) {
-            completeListeningActivity()
+            completeListeningActivity(isComplete = true)
         }
         mediaPlayer.release()
         mediaSession.release()

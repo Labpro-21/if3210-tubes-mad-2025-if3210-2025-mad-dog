@@ -15,6 +15,6 @@ interface RecentlyPlayedDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRecentlyPlayed(recentlyPlayed: RecentlyPlayed)
 
-    @Query("SELECT * FROM recently_played WHERE userId = :userId ORDER BY playedAt DESC")
+    @Query("SELECT * FROM recently_played WHERE userId = :userId ORDER BY playedAt DESC LIMIT 5")
     fun getRecentlyPlayedSongsForUser(userId: Int): Flow<List<RecentlyPlayedWithSong>>
 }

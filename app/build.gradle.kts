@@ -113,4 +113,8 @@ dependencies {
 
     // Kotlin script runtime (if needed)
     implementation(kotlin("script-runtime"))
+
+    implementation("com.patrykandpatrick.vico:compose:1.13.1")
+    implementation("com.patrykandpatrick.vico:compose-m3:1.13.1")
+    implementation("com.patrykandpatrick.vico:core:1.13.1")
 }

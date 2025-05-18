@@ -18,12 +18,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.rememberAsyncImagePainter
@@ -37,7 +39,8 @@ import kotlinx.coroutines.withContext
 import androidx.palette.graphics.Palette
 import coil.imageLoader
 import com.example.purrytify.ui.theme.SpotifyBlack
-import com.example.purrytify.ui.theme.SpotifyLightGray
+import kotlin.math.max
+import kotlin.math.min
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,6 +51,29 @@ fun MiniPlayer(mainViewModel: MainViewModel, onMiniPlayerClick: () -> Unit, modi
     var dominantColor by remember { mutableStateOf(SpotifyBlack) }
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
+    // Function to ensure color isn't too bright and maintains good contrast
+    fun adjustColorBrightness(color: Color): Color {
+        val red = color.red
+        val green = color.green
+        val blue = color.blue
+        
+        // Calculate perceived brightness using relative luminance formula
+        val brightness = (0.299 * red + 0.587 * green + 0.114 * blue)
+        
+        // If the color is too bright (brightness > 0.5), darken it
+        return if (brightness > 0.5) {
+            val darkenFactor = 0.7f // Adjust this value to control darkness
+            Color(
+                red = max(0f, red * darkenFactor),
+                green = max(0f, green * darkenFactor),
+                blue = max(0f, blue * darkenFactor),
+                alpha = color.alpha
+            )
+        } else {
+            color
+        }
+    }
 
     currentSong?.let { song ->
         val artworkUri = song.artwork?.let { Uri.parse(it) }
@@ -77,90 +103,124 @@ fun MiniPlayer(mainViewModel: MainViewModel, onMiniPlayerClick: () -> Unit, modi
                     val bitmap = drawable.bitmap
                     if (bitmap != null) {
                         val palette = Palette.from(bitmap).generate()
-                        val color = palette.getDarkVibrantColor(palette.getMutedColor(SpotifyBlack.toArgb()))
+                        val color = palette.getDarkVibrantColor(palette.getDarkMutedColor(SpotifyBlack.toArgb()))
                         withContext(Dispatchers.Main) {
-                            dominantColor = Color(color)
+                            dominantColor = adjustColorBrightness(Color(color))
                         }
                     }
                 }
             }
         }
 
-        Row(
+        Box(
             modifier = modifier
                 .fillMaxWidth()
-                .height(if (isLandscape) 56.dp else 72.dp) // Smaller height in landscape
-                .background(dominantColor.copy(alpha = 0.8f), shape = RoundedCornerShape(12.dp))
-                .clip(RoundedCornerShape(12.dp))
+                .height(if (isLandscape) 64.dp else 80.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            dominantColor,
+                            dominantColor.copy(alpha = 0.9f)
+                        )
+                    )
+                )
                 .clickable { onMiniPlayerClick() }
-                .padding(horizontal = 8.dp), // Adjust horizontal padding
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Image(
-                painter = painter,
-                contentDescription = "Artist Artwork",
+            // Semi-transparent overlay for better text readability
+            Box(
                 modifier = Modifier
-                    .size(if (isLandscape) 40.dp else 56.dp) // Smaller image in landscape
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.2f),
+                                Color.Black.copy(alpha = 0.4f)
+                            )
+                        )
+                    )
             )
 
-            Column(
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 8.dp),
-                verticalArrangement = Arrangement.Center // Center vertically in landscape
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = song.name,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 1,
-                    fontSize = if (isLandscape) 14.sp else 16.sp // Smaller font in landscape
+                Image(
+                    painter = painter,
+                    contentDescription = "Artist Artwork",
+                    modifier = Modifier
+                        .size(if (isLandscape) 40.dp else 56.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
                 )
-                if (!isLandscape) {
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     Text(
-                        text = song.artist,
-                        color = Color.Gray,
+                        text = song.name,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
                         maxLines = 1,
-                        fontSize = 12.sp
+                        overflow = TextOverflow.Ellipsis,
+                        fontSize = if (isLandscape) 14.sp else 16.sp
                     )
-                }
-                Slider(
-                    value = sliderPosition,
-                    onValueChange = {
-                        val newPosition = (it * song.duration.toInt()).toInt()
-                        mainViewModel.seekTo(newPosition)
-                    },
-                    modifier = Modifier.fillMaxWidth().height(if (isLandscape) 16.dp else 24.dp), // Smaller slider
-                    valueRange = 0f..1f,
-                    thumb = {},
-                    track = {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(2.dp) // Thinner track
-                                .background(Color.LightGray.copy(alpha = 0.5f), shape = RoundedCornerShape(1.dp))
-                        ) {
+                    if (!isLandscape) {
+                        Text(
+                            text = song.artist,
+                            color = Color.White.copy(alpha = 0.7f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 12.sp
+                        )
+                    }
+                    Slider(
+                        value = sliderPosition,
+                        onValueChange = {
+                            val newPosition = (it * song.duration.toInt()).toInt()
+                            mainViewModel.seekTo(newPosition)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(16.dp),
+                        valueRange = 0f..1f,
+                        thumb = {},
+                        track = {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxWidth(sliderPosition)
+                                    .fillMaxWidth()
                                     .height(2.dp)
-                                    .background(Color.White, shape = RoundedCornerShape(1.dp))
-                            )
+                                    .background(Color.White.copy(alpha = 0.3f), RoundedCornerShape(1.dp))
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(sliderPosition)
+                                        .height(2.dp)
+                                        .background(Color.White, RoundedCornerShape(1.dp))
+                                )
+                            }
                         }
-                    }
-                )
-            }
+                    )
+                }
 
-            IconButton(onClick = { mainViewModel.playSong(song) }) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = "Play/Pause",
-                    tint = Color.White,
-                    modifier = Modifier.size(if (isLandscape) 24.dp else 32.dp) // Smaller icon
-                )
+                IconButton(
+                    onClick = { mainViewModel.playSong(song) },
+                    modifier = Modifier
+                        .size(if (isLandscape) 40.dp else 48.dp)
+                        .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(24.dp))
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = "Play/Pause",
+                        tint = Color.White,
+                        modifier = Modifier.size(if (isLandscape) 24.dp else 28.dp)
+                    )
+                }
             }
         }
     }

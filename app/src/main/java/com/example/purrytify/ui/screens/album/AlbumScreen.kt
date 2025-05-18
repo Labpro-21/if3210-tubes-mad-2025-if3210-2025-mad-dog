@@ -75,7 +75,7 @@ fun AlbumScreen(
 ) {
     LaunchedEffect(region, isDailyPlaylist) {
         if (isDailyPlaylist) {
-                albumViewModel.loadDailyPlaylist(region)
+            albumViewModel.loadDailyPlaylist(region)
         } else {
             albumViewModel.loadSongs(region)
         }
@@ -86,6 +86,13 @@ fun AlbumScreen(
     val errorMessage by albumViewModel.errorMessage.collectAsState()
     val downloadProgress by albumViewModel.downloadProgress.collectAsState()
     val context = LocalContext.current
+    
+    // Cache song sequences in MainViewModel whenever songs list changes
+    LaunchedEffect(songs) {
+        if (songs.isNotEmpty()) {
+            mainViewModel.cacheOnlineSongSequence(region, songs)
+        }
+    }
 
     // Determine the correct image and title based on type
     val (imageName, title, description) = if (isDailyPlaylist) {
