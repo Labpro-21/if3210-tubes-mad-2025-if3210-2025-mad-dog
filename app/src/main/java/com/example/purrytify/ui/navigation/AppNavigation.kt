@@ -65,7 +65,7 @@ fun AppNavigation(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: Screen.Home.route
     val isMiniPlayerActive by mainViewModel.isMiniPlayerActive.collectAsState()
-    val showMiniPlayer = (currentRoute == Screen.Home.route || currentRoute == Screen.Library.route || currentRoute == Screen.Album.route ) && isMiniPlayerActive
+    val showMiniPlayer = (currentRoute == Screen.Home.route || currentRoute == Screen.Library.route || currentRoute == Screen.Album.route || currentRoute == Screen.Profile.route) && isMiniPlayerActive
     val isOnlinePlaying by mainViewModel.isOnlineSong.collectAsState() // Get the isOnlinePlaying state
 
     val configuration = LocalConfiguration.current
