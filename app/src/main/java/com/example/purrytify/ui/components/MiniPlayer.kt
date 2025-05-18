@@ -51,6 +51,7 @@ fun MiniPlayer(mainViewModel: MainViewModel, onMiniPlayerClick: () -> Unit, modi
     var dominantColor by remember { mutableStateOf(SpotifyBlack) }
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isOnlinePlaying by mainViewModel.isOnlineSong.collectAsState()
 
     // Function to ensure color isn't too bright and maintains good contrast
     fun adjustColorBrightness(color: Color): Color {
@@ -220,6 +221,24 @@ fun MiniPlayer(mainViewModel: MainViewModel, onMiniPlayerClick: () -> Unit, modi
                         tint = Color.White,
                         modifier = Modifier.size(if (isLandscape) 24.dp else 28.dp)
                     )
+                }
+
+                if (isOnlinePlaying && song.id > 0) {
+                    IconButton(
+                        onClick = {
+                            val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND)
+                            shareIntent.type = "text/plain"
+                            shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, "purrytify://song/${song.id}")
+                            context.startActivity(android.content.Intent.createChooser(shareIntent, null))
+                        },
+                        modifier = Modifier.align(Alignment.CenterEnd)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = com.example.purrytify.R.drawable.ic_share),
+                            contentDescription = "Share Song",
+                            tint = Color.White
+                        )
+                    }
                 }
             }
         }
