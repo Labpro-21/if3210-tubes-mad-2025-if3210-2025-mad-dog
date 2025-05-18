@@ -36,7 +36,9 @@ import androidx.compose.foundation.clickable
 @Composable
 fun SoundCapsuleCard(
     soundCapsule: ListeningActivityDao.SoundCapsule?,
-    onTimeListenedClick: () -> Unit = {}
+    onTimeListenedClick: () -> Unit = {},
+    onTopSongClick: () -> Unit = {},
+    onTopArtistClick: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier
@@ -98,10 +100,12 @@ fun SoundCapsuleCard(
                     TopArtistSongCard(
                         title = "Top artist",
                         name = soundCapsule.topArtist ?: "-",
-                        artworkUrl = null, // Artwork URL untuk artis mungkin perlu ditambahkan
-                        modifier = Modifier.weight(1f),
-                        backgroundColor = Color(0xFF212121), // Warna abu-abu gelap
-                        textColor = Color.White // Sesuaikan warna teks jika perlu
+                        artworkUrl = null,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onTopArtistClick() },
+                        backgroundColor = Color(0xFF212121),
+                        textColor = Color.White
                     )
 
                     // Card Top Song
@@ -110,9 +114,11 @@ fun SoundCapsuleCard(
                         name = soundCapsule.topSong?.name ?: "-",
                         artworkUrl = soundCapsule.topSong?.artwork,
                         artistName = soundCapsule.topSong?.artist,
-                        modifier = Modifier.weight(1f),
-                        backgroundColor = Color(0xFF212121), // Warna abu-abu gelap
-                        textColor = Color.White // Sesuaikan warna teks jika perlu
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onTopSongClick() },
+                        backgroundColor = Color(0xFF212121),
+                        textColor = Color.White
                     )
                 }
                 Spacer(modifier = Modifier.height(12.dp))
@@ -225,13 +231,24 @@ fun TopArtistSongCard(
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = title,
-                fontWeight = FontWeight.Medium,
-                color = textColor.copy(alpha = 0.7f),
-                fontSize = 14.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    fontWeight = FontWeight.Medium,
+                    color = textColor.copy(alpha = 0.7f),
+                    fontSize = 14.sp
+                )
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "View details",
+                    tint = textColor.copy(alpha = 0.7f),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = name,
@@ -255,7 +272,7 @@ fun TopArtistSongCard(
                     contentDescription = "$title artwork",
                     modifier = Modifier
                         .size(50.dp)
-                        .clip(CircleShape), // Tambahkan modifier clip dengan CircleShape
+                        .clip(CircleShape),
                     placeholder = painterResource(id = R.drawable.music_placeholder),
                     error = painterResource(id = R.drawable.music_placeholder)
                 )
@@ -266,7 +283,7 @@ fun TopArtistSongCard(
                     tint = Color.Gray,
                     modifier = Modifier
                         .size(50.dp)
-                        .clip(CircleShape) // Tambahkan modifier clip dengan CircleShape
+                        .clip(CircleShape)
                 )
             }
         }

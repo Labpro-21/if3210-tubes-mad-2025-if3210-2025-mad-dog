@@ -56,7 +56,9 @@ fun ProfileScreen(
     viewModel: ProfileViewModel = viewModel(),
     onNavigateToSettings: () -> Unit = {},
     onNavigateToEditProfile: () -> Unit = {},
-    onNavigateToListeningStats: () -> Unit = {}
+    onNavigateToListeningStats: () -> Unit = {},
+    onNavigateToTopSongs: () -> Unit = {},
+    onNavigateToTopArtist: () -> Unit = {}
 ) {
     val profile by viewModel.profile.collectAsState()
     val songsCount by viewModel.songsCount.collectAsState()
@@ -202,7 +204,9 @@ fun ProfileScreen(
                 // Panggil composable SoundCapsuleCard di sini
                 SoundCapsuleCard(
                     soundCapsule = soundCapsuleData,
-                    onTimeListenedClick = onNavigateToListeningStats
+                    onTimeListenedClick = onNavigateToListeningStats,
+                    onTopSongClick = onNavigateToTopSongs,
+                    onTopArtistClick = onNavigateToTopArtist
                 )
             }
         }

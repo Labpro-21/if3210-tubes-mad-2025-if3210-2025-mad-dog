@@ -34,6 +34,8 @@ import com.example.purrytify.ui.screens.profile.ProfileScreen
 import com.example.purrytify.ui.screens.setting.SettingScreen
 import com.example.purrytify.ui.screens.songdetail.SongDetailScreen
 import com.example.purrytify.ui.screens.statistics.ListeningStatsScreen
+import com.example.purrytify.ui.screens.topsongs.TopSongsScreen
+import com.example.purrytify.ui.screens.topartist.TopArtistScreen
 import com.example.purrytify.ui.theme.SpotifyBlack
 
 sealed class Screen(val route: String) {
@@ -47,6 +49,8 @@ sealed class Screen(val route: String) {
     object EditProfile : Screen("editProfile")
     object LocationPicker : Screen("locationPicker")
     object ListeningStats: Screen("listeningstats")
+    object TopSongs: Screen("topsongs")
+    object TopArtist: Screen("topartist")
 }
 
 @Composable
@@ -154,6 +158,12 @@ fun AppNavigation(
                         },
                         onNavigateToListeningStats = {
                             navController.navigate(Screen.ListeningStats.route)
+                        },
+                        onNavigateToTopSongs = {
+                            navController.navigate(Screen.TopSongs.route)
+                        },
+                        onNavigateToTopArtist = {
+                            navController.navigate(Screen.TopArtist.route)
                         }
                     )
                     
@@ -216,7 +226,7 @@ fun AppNavigation(
                 composable(
                     Screen.Album.route,
                     arguments = listOf(navArgument("region") {type = NavType.StringType}))
-                {backStackEntry ->
+                 {backStackEntry ->
                     val region = backStackEntry.arguments?.getString("region")?:"GLOBAL"
                     AlbumScreen(
                         region = region,
@@ -290,6 +300,22 @@ fun AppNavigation(
                         navController = navController,
                         mainViewModel = mainViewModel,
                         isDailyPlaylist = isDailyPlaylist
+                    )
+                }
+
+                composable(Screen.TopSongs.route) {
+                    TopSongsScreen(
+                        onNavigateBack = {
+                            navController.popBackStack()
+                        }
+                    )
+                }
+
+                composable(Screen.TopArtist.route) {
+                    TopArtistScreen(
+                        onNavigateBack = {
+                            navController.popBackStack()
+                        }
                     )
                 }
             }

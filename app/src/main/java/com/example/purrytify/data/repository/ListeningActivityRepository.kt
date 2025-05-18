@@ -1,6 +1,7 @@
 package com.example.purrytify.data.repository
 
 import com.example.purrytify.db.dao.ListeningActivityDao
+import com.example.purrytify.db.dao.ListeningActivityDao.MonthlyPlayedSong
 import com.example.purrytify.db.entity.ListeningActivity
 
 class ListeningActivityRepository private constructor(
@@ -68,5 +69,13 @@ class ListeningActivityRepository private constructor(
 
     suspend fun getDailyListeningData(userId: Int): List<ListeningActivityDao.DailyListeningStats>{
         return listeningActivityDao.getDailyListeningStatsLastMonth(userId)
+    }
+
+    suspend fun getMonthlyPlayedSongs(userId: Int): List<ListeningActivityDao.MonthlyPlayedSong>{
+        return listeningActivityDao.getMonthlyPlayedSongs(userId)
+    }
+
+    suspend fun getMonthlyArtistsStats(userId: Int): List<ListeningActivityDao.MonthlyArtistStats> {
+        return listeningActivityDao.getMonthlyArtistsStats(userId)
     }
 }
