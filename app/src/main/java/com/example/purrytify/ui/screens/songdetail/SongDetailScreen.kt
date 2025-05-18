@@ -54,6 +54,8 @@ import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import com.example.purrytify.MainViewModel
 import com.example.purrytify.R
+import com.example.purrytify.data.model.AudioOutputDevice
+import com.example.purrytify.ui.screens.songdetail.AudioOutputViewModel
 import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.ui.navigation.Screen
 import com.example.purrytify.ui.screens.library.UploadButton
@@ -61,6 +63,11 @@ import com.example.purrytify.ui.theme.SpotifyBlack
 import com.example.purrytify.utils.ColorUtils
 import com.example.purrytify.utils.MediaUtils
 import kotlinx.coroutines.launch
+import android.Manifest
+import android.os.Build
+import androidx.core.content.ContextCompat
+import androidx.core.app.ActivityCompat
+import android.content.pm.PackageManager
 
 @Composable
 fun SongDetailScreen(
@@ -86,6 +93,23 @@ fun SongDetailScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     viewModel.setOnline(isOnline)
+
+    val audioOutputViewModel: AudioOutputViewModel = viewModel()
+    val devices by audioOutputViewModel.devices.collectAsState()
+    val selectedDevice by audioOutputViewModel.selectedDevice.collectAsState()
+    val audioError by audioOutputViewModel.error.collectAsState()
+    var showDeviceDialog by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val activity = LocalContext.current as? android.app.Activity
+    val bluetoothPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+        if (isGranted) {
+            audioOutputViewModel.scanDevices()
+            showDeviceDialog = true
+        } else {
+            Toast.makeText(context, "Bluetooth permission required to scan devices", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     /*
     LaunchedEffect(playbackCompletedState) {
@@ -135,6 +159,20 @@ fun SongDetailScreen(
                 onOptionClick = { showOptionsDialog = true },
                 isOnline = isOnline,
                 currentRegion = region,
+                selectedDevice = selectedDevice,
+                onShowDeviceDialog = {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                            audioOutputViewModel.scanDevices()
+                            showDeviceDialog = true
+                        } else {
+                            bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                        }
+                    } else {
+                        audioOutputViewModel.scanDevices()
+                        showDeviceDialog = true
+                    }
+                }
                 isDailyPlaylist = isDailyPlaylist
             )
             if (showEditDialog) {
@@ -165,6 +203,30 @@ fun SongDetailScreen(
                     },
                     isLandscape = isLandscape,
                     isOnline = isOnline
+                )
+            }
+            if (audioError != null) {
+                AlertDialog(
+                    onDismissRequest = { audioOutputViewModel.clearError() },
+                    title = { Text("Audio Output Error") },
+                    text = { Text(audioError ?: "") },
+                    confirmButton = {
+                        TextButton(onClick = { audioOutputViewModel.clearError() }) {
+                            Text("OK")
+                        }
+                    }
+                )
+            }
+            if (showDeviceDialog) {
+                AudioOutputDeviceDialog(
+                    devices = devices,
+                    selectedDevice = selectedDevice,
+                    onSelect = {
+                        audioOutputViewModel.selectDevice(it)
+                        showDeviceDialog = false
+                    },
+                    onDismiss = { showDeviceDialog = false },
+                    onRefresh = { audioOutputViewModel.scanDevices() }
                 )
             }
         }
@@ -263,6 +325,8 @@ fun SongDetailsContent(
     onOptionClick: () -> Unit,
     isOnline: Boolean,
     currentRegion: String,
+    selectedDevice: AudioOutputDevice?,
+    onShowDeviceDialog: () -> Unit
     isDailyPlaylist: Boolean,
 ) {
     val currentPosition by mainViewModel.currentPosition.collectAsState()
@@ -536,6 +600,35 @@ fun SongDetailsContent(
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(if (isLandscape) 16.dp else 32.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clickable { onShowDeviceDialog() }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_baseline_speaker_24),
+                            contentDescription = "Output Device",
+                            tint = if (selectedDevice != null) Color.Green else Color.Gray,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = selectedDevice?.name ?: "Internal Speaker",
+                            color = if (selectedDevice != null) Color.Green else Color.Gray,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -703,4 +796,46 @@ fun EditSongDialogContent(
             }
         }
     }
+}
+
+@Composable
+fun AudioOutputDeviceDialog(
+    devices: List<AudioOutputDevice>,
+    selectedDevice: AudioOutputDevice?,
+    onSelect: (AudioOutputDevice) -> Unit,
+    onDismiss: () -> Unit,
+    onRefresh: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Choose Output Device") },
+        text = {
+            Column {
+                devices.forEach { device ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(device) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = device.id == selectedDevice?.id,
+                            onClick = { onSelect(device) }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(device.name)
+                        Spacer(modifier = Modifier.weight(1f))
+                        Text(if (device.isConnected) "Connected" else "Available", color = if (device.isConnected) Color.Green else Color.Gray)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onRefresh) { Text("Refresh") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
