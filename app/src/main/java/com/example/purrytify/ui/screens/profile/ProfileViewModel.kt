@@ -150,17 +150,17 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         }
     }
     fun updateProfile(location: String, profilePhotoUri: Uri?) {
-        viewModelScope.launch { // Biasanya operasi jaringan tidak dibatasi ke Dispatchers.IO
+        viewModelScope.launch {
             _updateProfileStatus.value = UpdateProfileStatus.Loading
 
             if (networkMonitor.isConnected.first()) {
                 try {
                     val result = repository.updateProfile(location, profilePhotoUri)
                     result.fold(
-                        onSuccess = { updatedProfile ->
-                            _profile.value = updatedProfile
+                        onSuccess = { message ->
                             _updateProfileStatus.value = UpdateProfileStatus.Success
-                            getProfile() // Memanggil getProfile yang sekarang sudah benar
+                            // Refresh profile after successful update
+                            getProfile()
                         },
                         onFailure = { error ->
                             _updateProfileStatus.value = UpdateProfileStatus.Error(error.message ?: "Failed to update profile")

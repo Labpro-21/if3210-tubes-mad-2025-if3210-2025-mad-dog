@@ -4,12 +4,14 @@ import android.app.Application
 import com.example.purrytify.db.AppDatabase
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import com.example.purrytify.data.api.NetworkModule
 import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.data.auth.TokenManager
 import com.example.purrytify.data.model.ProfileResponse
 import com.example.purrytify.db.dao.SongsDao
 import com.example.purrytify.db.dao.UsersDao
+import com.example.purrytify.db.entity.Users
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -42,16 +44,16 @@ class ProfileRepository private constructor(
         }
         return@withContext null;
     };
-    
-    suspend fun updateProfile(location: String, profilePhotoUri: Uri?): Result<ProfileResponse> = withContext(Dispatchers.IO) {
+
+    suspend fun updateProfile(location: String, profilePhotoUri: Uri?): Result<String> = withContext(Dispatchers.IO) {
         val token = tokenManager.getAccessToken()
         if (token == null) {
             return@withContext Result.failure(Exception("Token not found"))
         }
-        
+
         try {
             val locationRequestBody = RequestBody.create("text/plain".toMediaType(), location)
-            
+
             // Klo ada profile photo
             val profilePhotoPart = if (profilePhotoUri != null) {
                 val context = getApplication().applicationContext
@@ -64,17 +66,36 @@ class ProfileRepository private constructor(
             } else {
                 null
             }
-            
-            val response = api.updateProfile("Bearer $token", locationRequestBody, profilePhotoPart)
-            
-            if (response.isSuccessful && response.body()?.success == true) {
-                val updatedProfile = response.body()?.data
-                updatedProfile?.apply {
-                    profilePhoto = NetworkModule.getProfileImageUrl(profilePhoto)
-                }
-                return@withContext Result.success(updatedProfile!!)
+
+            val response = if (profilePhotoPart != null) {
+                api.updateProfile("Bearer $token", locationRequestBody, profilePhotoPart)
             } else {
-                return@withContext Result.failure(Exception(response.body()?.message ?: "Failed to update profile"))
+                api.updateProfileNoPhoto("Bearer $token", locationRequestBody)
+            }
+
+            if (response.isSuccessful) {
+                val userId = authRepository.currentUserId
+                if (userId != null) {
+                    val user = usersdao.getUserById(userId)
+                    if (user != null) {
+                        val updatedUser = user.copy(region = location)
+                        usersdao.updateUser(updatedUser)
+                    }
+                }
+
+                val message = response.body()?.message ?: "Profile updated successfully"
+
+                val profileResponse = api.getProfile("Bearer $token")
+                if (profileResponse.isSuccessful) {
+                    val updatedProfile = profileResponse.body()
+                    updatedProfile?.apply {
+                        profilePhoto = NetworkModule.getProfileImageUrl(profilePhoto)
+                    }
+                }
+
+                return@withContext Result.success(message)
+            } else {
+                return@withContext Result.failure(Exception("Failed to update profile: ${response.code()} ${response.message()}"))
             }
         } catch (e: Exception) {
             return@withContext Result.failure(e)
@@ -88,6 +109,15 @@ class ProfileRepository private constructor(
             }
         }
         return tempFile
+    }
+
+    suspend fun getUserById(userId: Int): Users? = withContext(Dispatchers.IO) {
+        return@withContext usersdao.getUserById(userId)
+    }
+
+    suspend fun updateUser(user: Users) = withContext(Dispatchers.IO) {
+        usersdao.updateUser(user)
+        Log.d("ProfileRepository", "User updated: $user")
     }
     
     private fun getApplication(): Application {
