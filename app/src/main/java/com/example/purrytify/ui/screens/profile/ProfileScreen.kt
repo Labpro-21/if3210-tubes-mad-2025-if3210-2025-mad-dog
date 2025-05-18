@@ -1,5 +1,14 @@
 package com.example.purrytify.ui.screens.profile
 
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -30,16 +40,21 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -48,8 +63,13 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberAsyncImagePainter
 import com.example.purrytify.R
+import com.example.purrytify.db.dao.ListeningActivityDao
 import com.example.purrytify.ui.screens.soundcapsule.SoundCapsuleCard
 import com.example.purrytify.ui.theme.SpotifyGreen
+import com.example.purrytify.utils.CsvExporter
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @Composable
 fun ProfileScreen(
@@ -70,7 +90,45 @@ fun ProfileScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val scrollState = rememberScrollState()
-    val soundCapsuleData by viewModel.soundCapsuleData.collectAsState() // Ambil state SoundCapsule
+    val soundCapsuleData by viewModel.soundCapsuleData.collectAsState()
+    val context = LocalContext.current
+
+    // State for showing permission dialog
+    var showPermissionDialog by remember { mutableStateOf(false) }
+
+    // Permission launcher for storage access
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            handleCsvDownload(context, soundCapsuleData)
+        } else {
+            showPermissionDialog = true
+        }
+    }
+
+    if (showPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showPermissionDialog = false },
+            title = { Text("Permission Required") },
+            text = { Text("Storage permission is required to save the CSV file. Please enable it in Settings.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showPermissionDialog = false
+                        openAppSettings(context)
+                    }
+                ) {
+                    Text("Open Settings")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPermissionDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     // Fetch profile data when first loaded and when returning to this screen
     LaunchedEffect(Unit) {
@@ -201,12 +259,21 @@ fun ProfileScreen(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Panggil composable SoundCapsuleCard di sini
+                // Update SoundCapsuleCard with new download handler
                 SoundCapsuleCard(
                     soundCapsule = soundCapsuleData,
                     onTimeListenedClick = onNavigateToListeningStats,
                     onTopSongClick = onNavigateToTopSongs,
-                    onTopArtistClick = onNavigateToTopArtist
+                    onTopArtistClick = onNavigateToTopArtist,
+                    onDownloadClick = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            // Android 10 (API 29) and above don't need storage permission for Downloads
+                            handleCsvDownload(context, soundCapsuleData)
+                        } else {
+                            // For older versions, request permission
+                            permissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                        }
+                    }
                 )
             }
         }
@@ -305,6 +372,42 @@ fun ProfileScreenPreview() {
             ProfileMenuItem(title = "Settings", icon = Icons.Default.Settings, onClick = {})
             Spacer(modifier = Modifier.height(16.dp))
             SoundCapsuleCard(soundCapsule = null) // Tambahkan preview SoundCapsule
+        }
+    }
+}
+
+private fun openAppSettings(context: Context) {
+    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+        data = Uri.fromParts("package", context.packageName, null)
+    }
+    context.startActivity(intent)
+}
+
+private fun handleCsvDownload(context: Context, soundCapsule: ListeningActivityDao.SoundCapsule?) {
+    if (soundCapsule == null) {
+        Toast.makeText(context, "No data available to download", Toast.LENGTH_SHORT).show()
+        return
+    }
+
+    CoroutineScope(Dispatchers.IO).launch {
+        try {
+            val file = CsvExporter.exportSoundCapsuleToCSV(context, soundCapsule)
+            CoroutineScope(Dispatchers.Main).launch {
+                Toast.makeText(
+                    context,
+                    "CSV saved to Downloads: ${file.name}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            CoroutineScope(Dispatchers.Main).launch {
+                Toast.makeText(
+                    context,
+                    "Failed to save CSV: ${e.message}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
     }
 }

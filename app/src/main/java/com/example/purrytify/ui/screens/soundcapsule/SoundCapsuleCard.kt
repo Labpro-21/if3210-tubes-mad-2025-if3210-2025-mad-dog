@@ -13,9 +13,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,7 +40,8 @@ fun SoundCapsuleCard(
     soundCapsule: ListeningActivityDao.SoundCapsule?,
     onTimeListenedClick: () -> Unit = {},
     onTopSongClick: () -> Unit = {},
-    onTopArtistClick: () -> Unit = {}
+    onTopArtistClick: () -> Unit = {},
+    onDownloadClick: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier
@@ -54,12 +57,28 @@ fun SoundCapsuleCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            Text(
-                text = "Your Sound Capsule",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Your Sound Capsule",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                IconButton(
+                    onClick = onDownloadClick,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = "Download CSV",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(16.dp))
 
             if (soundCapsule != null) {
