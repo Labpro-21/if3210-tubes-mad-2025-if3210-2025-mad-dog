@@ -1,6 +1,7 @@
 package com.example.purrytify.ui.screens.songdetail
 
 import android.annotation.SuppressLint
+import android.app.Application
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
@@ -34,6 +35,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
@@ -70,9 +72,14 @@ import android.content.pm.PackageManager
 @Composable
 fun SongDetailScreen(
     songId: Int,
-    viewModel: SongDetailViewModel = viewModel(),
     navController: NavController,
     mainViewModel: MainViewModel,
+    viewModel: SongDetailViewModel = viewModel(
+        factory = SongDetailViewModel.Factory(
+            application = LocalContext.current.applicationContext as Application,
+            mainViewModel = mainViewModel
+        )
+    ),
     isOnline: Boolean,
     region: String = "GLOBAL",
     isDailyPlaylist: Boolean = false
@@ -166,6 +173,7 @@ fun SongDetailScreen(
                         showDeviceDialog = true
                     }
                 }
+                isDailyPlaylist = isDailyPlaylist
             )
             if (showEditDialog) {
                 Dialog(
@@ -319,6 +327,7 @@ fun SongDetailsContent(
     currentRegion: String,
     selectedDevice: AudioOutputDevice?,
     onShowDeviceDialog: () -> Unit
+    isDailyPlaylist: Boolean,
 ) {
     val currentPosition by mainViewModel.currentPosition.collectAsState()
     val isPlaying by mainViewModel.isPlaying.collectAsState()
@@ -396,7 +405,14 @@ fun SongDetailsContent(
                 contentDescription = "Artist Artwork",
                 modifier = Modifier
                     .size(if (isLandscape) 200.dp else 300.dp)
+                    .shadow(
+                        elevation = 16.dp,
+                        shape = RoundedCornerShape(8.dp),
+                        spotColor = Color.Black.copy(alpha = 0.5f),
+                        ambientColor = Color.Black.copy(alpha = 0.5f)
+                    )
                     .then(if (showBorder) Modifier.border(2.dp, Color.White, RectangleShape) else Modifier),
+
                 contentScale = ContentScale.Crop
             )
 
@@ -555,19 +571,25 @@ fun SongDetailsContent(
                 }
                 IconButton(onClick = {
                     if (!isOnline) {
-                        viewModel.skipNext(song.id, isOnline = false) { nextSongId ->
+                        viewModel.skipNext(song.id, isOnline = false, onNavigate = { nextSongId ->
                             navController.navigate(Screen.SongDetail.route.replace("{songId}", nextSongId.toString())) {
                                 popUpTo(Screen.SongDetail.route.replace("{songId}", song.id.toString())) { inclusive = true }
                                 launchSingleTop = true
                             }
-                        }
+                        })
                     } else {
-                        viewModel.skipNext(song.id, isOnline = true, currentRegion = currentRegion) { nextSongId ->
-                            navController.navigate(Screen.SongDetailOnline.route.replace("{region}", currentRegion).replace("{songId}", nextSongId.toString())) {
-                                popUpTo(Screen.SongDetailOnline.route.replace("{region}", currentRegion).replace("{songId}", song.id.toString())) { inclusive = true }
-                                launchSingleTop = true
-                            }
-                        }
+                        viewModel.skipNext(
+                            currentSongId = song.id, 
+                            isOnline = true, 
+                            currentRegion = currentRegion,
+                            onNavigate = { nextSongId ->
+                                navController.navigate(Screen.SongDetailOnline.route.replace("{region}", currentRegion).replace("{songId}", nextSongId.toString())) {
+                                    popUpTo(Screen.SongDetailOnline.route.replace("{region}", currentRegion).replace("{songId}", song.id.toString())) { inclusive = true }
+                                    launchSingleTop = true
+                                }
+                            },
+                            isDailyPlaylist = isDailyPlaylist
+                        )
                     }
                 }) {
                     Icon(

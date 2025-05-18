@@ -17,11 +17,23 @@ interface ProfileApi {
     @GET("/api/profile")
     suspend fun getProfile(@Header("Authorization") token: String): Response<ProfileResponse>
     
+    // In your API interface
     @Multipart
-    @PATCH("/api/profile")
+    @PATCH("/api/profile") 
     suspend fun updateProfile(
         @Header("Authorization") token: String,
         @Part("location") location: RequestBody,
         @Part profilePhoto: MultipartBody.Part?
-    ): Response<UpdateProfileResponse>
+    ): Response<MessageResponse>
+
+    @Multipart
+    @PATCH("/api/profile") 
+    suspend fun updateProfileNoPhoto(
+        @Header("Authorization") token: String,
+        @Part("location") location: RequestBody
+    ): Response<MessageResponse>
+
+    data class MessageResponse(
+        val message: String
+    )
 }

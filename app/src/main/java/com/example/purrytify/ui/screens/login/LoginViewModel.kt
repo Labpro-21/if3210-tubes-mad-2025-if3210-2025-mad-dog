@@ -76,7 +76,11 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
                 .onSuccess { userData ->
                     val existingUser = usersDao.getUserById(userData.user.id)
                     if (existingUser == null) {
-                        val newUser = Users(id = userData.user.id, name = userData.user.username)
+                        val newUser = Users(
+                            id = userData.user.id,
+                            name = userData.user.username,
+                            region = "ID"
+                        )
                         usersDao.insertUser(newUser)
                         Log.d("LoginViewModel", "User inserted: ${userData.user.id}, ${userData.user.username}")
                     } else {

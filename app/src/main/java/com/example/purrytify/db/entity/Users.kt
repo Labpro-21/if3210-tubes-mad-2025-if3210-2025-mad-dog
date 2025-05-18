@@ -12,5 +12,6 @@ data class Users(
     val totalPlayed: Int = 0,
     val monthlyListeningTime: Long = 0, // Total waktu dengarkan dalam milidetik bulan ini
     val lastUpdatedMonth: Int = 0, // Bulan terakhir data diperbarui
-    var dailyPlaylistLastFetched: Date? = null
+    var dailyPlaylistLastFetched: Date? = null,
+    val region: String,
 )

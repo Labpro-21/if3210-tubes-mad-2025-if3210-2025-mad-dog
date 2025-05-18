@@ -1,5 +1,6 @@
 package com.example.purrytify.ui.navigation
 
+import android.app.Application
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -11,6 +12,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
@@ -33,7 +35,11 @@ import com.example.purrytify.ui.screens.profile.MapsPickerScreen
 import com.example.purrytify.ui.screens.profile.ProfileScreen
 import com.example.purrytify.ui.screens.setting.SettingScreen
 import com.example.purrytify.ui.screens.songdetail.SongDetailScreen
+import com.example.purrytify.ui.screens.statistics.ListeningStatsScreen
+import com.example.purrytify.ui.screens.topsongs.TopSongsScreen
+import com.example.purrytify.ui.screens.topartist.TopArtistScreen
 import com.example.purrytify.ui.theme.SpotifyBlack
+import com.example.purrytify.ui.screens.songdetail.SongDetailViewModel
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
@@ -45,6 +51,9 @@ sealed class Screen(val route: String) {
     object Album: Screen("album/{region}")
     object EditProfile : Screen("editProfile")
     object LocationPicker : Screen("locationPicker")
+    object ListeningStats: Screen("listeningstats")
+    object TopSongs: Screen("topsongs")
+    object TopArtist: Screen("topartist")
 }
 
 @Composable
@@ -56,7 +65,7 @@ fun AppNavigation(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: Screen.Home.route
     val isMiniPlayerActive by mainViewModel.isMiniPlayerActive.collectAsState()
-    val showMiniPlayer = (currentRoute == Screen.Home.route || currentRoute == Screen.Library.route || currentRoute == Screen.Album.route ) && isMiniPlayerActive
+    val showMiniPlayer = (currentRoute == Screen.Home.route || currentRoute == Screen.Library.route || currentRoute == Screen.Album.route || currentRoute == Screen.Profile.route) && isMiniPlayerActive
     val isOnlinePlaying by mainViewModel.isOnlineSong.collectAsState() // Get the isOnlinePlaying state
 
     val configuration = LocalConfiguration.current
@@ -149,6 +158,15 @@ fun AppNavigation(
                         },
                         onNavigateToEditProfile = {
                             navController.navigate(Screen.EditProfile.route)
+                        },
+                        onNavigateToListeningStats = {
+                            navController.navigate(Screen.ListeningStats.route)
+                        },
+                        onNavigateToTopSongs = {
+                            navController.navigate(Screen.TopSongs.route)
+                        },
+                        onNavigateToTopArtist = {
+                            navController.navigate(Screen.TopArtist.route)
                         }
                     )
                     
@@ -195,16 +213,23 @@ fun AppNavigation(
                 }
                 composable(Screen.Settings.route) {
                     SettingScreen(
+                        onLogout = onLogout,
                         onNavigateBack = {
                             navController.popBackStack()
-                        },
-                        onLogout = onLogout
+                        }
+                    )
+                }
+                composable(Screen.ListeningStats.route) {
+                    ListeningStatsScreen(
+                        onNavigateBack = {
+                            navController.popBackStack()
+                        }
                     )
                 }
                 composable(
                     Screen.Album.route,
                     arguments = listOf(navArgument("region") {type = NavType.StringType}))
-                {backStackEntry ->
+                 {backStackEntry ->
                     val region = backStackEntry.arguments?.getString("region")?:"GLOBAL"
                     AlbumScreen(
                         region = region,
@@ -224,11 +249,24 @@ fun AppNavigation(
                         isOnline = false
                     )
                     
-                    val songDetailViewModel = androidx.lifecycle.viewmodel.compose.viewModel<com.example.purrytify.ui.screens.songdetail.SongDetailViewModel>()
+                    val songDetailViewModel = viewModel<SongDetailViewModel>(
+                        factory = SongDetailViewModel.Factory(
+                            application = LocalContext.current.applicationContext as Application,
+                            mainViewModel = mainViewModel
+                        )
+                    )
                     
                     LaunchedEffect(Unit) {
                         mainViewModel.registerNavigationCallbacks(
-                            skipToNext = songDetailViewModel::skipNext,
+                            skipToNext = { currentSongId, isOnline, currentRegion, onNavigate ->
+                                songDetailViewModel.skipNext(
+                                    currentSongId = currentSongId,
+                                    isOnline = isOnline,
+                                    currentRegion = currentRegion,
+                                    onNavigate = onNavigate,
+                                    isDailyPlaylist = false
+                                )
+                            },
                             skipToPrevious = songDetailViewModel::skipPrevious
                         )
                     }
@@ -250,11 +288,24 @@ fun AppNavigation(
                         region = region
                     )
                     
-                    val songDetailViewModel = androidx.lifecycle.viewmodel.compose.viewModel<com.example.purrytify.ui.screens.songdetail.SongDetailViewModel>()
+                    val songDetailViewModel = viewModel<SongDetailViewModel>(
+                        factory = SongDetailViewModel.Factory(
+                            application = LocalContext.current.applicationContext as Application,
+                            mainViewModel = mainViewModel
+                        )
+                    )
                     
                     LaunchedEffect(Unit) {
                         mainViewModel.registerNavigationCallbacks(
-                            skipToNext = songDetailViewModel::skipNext,
+                            skipToNext = { currentSongId, isOnline, currentRegion, onNavigate ->
+                                songDetailViewModel.skipNext(
+                                    currentSongId = currentSongId,
+                                    isOnline = isOnline,
+                                    currentRegion = currentRegion,
+                                    onNavigate = onNavigate,
+                                    isDailyPlaylist = false
+                                )
+                            },
                             skipToPrevious = songDetailViewModel::skipPrevious
                         )
                     }
@@ -278,6 +329,22 @@ fun AppNavigation(
                         navController = navController,
                         mainViewModel = mainViewModel,
                         isDailyPlaylist = isDailyPlaylist
+                    )
+                }
+
+                composable(Screen.TopSongs.route) {
+                    TopSongsScreen(
+                        onNavigateBack = {
+                            navController.popBackStack()
+                        }
+                    )
+                }
+
+                composable(Screen.TopArtist.route) {
+                    TopArtistScreen(
+                        onNavigateBack = {
+                            navController.popBackStack()
+                        }
                     )
                 }
             }
