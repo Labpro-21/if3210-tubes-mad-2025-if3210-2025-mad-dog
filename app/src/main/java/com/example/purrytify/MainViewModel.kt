@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import com.example.purrytify.data.model.OnlineSongResponse
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -72,6 +73,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Navigation callbacks for media controller
     private var skipToNextNavigationCallback: ((Int, Boolean, String, (Int) -> Unit) -> Unit)? = null
     private var skipToPreviousNavigationCallback: ((Int, Boolean, String, (Int) -> Unit) -> Unit)? = null
+
+    // Add state to store online song sequences by region
+    private val _onlineSongSequences = MutableStateFlow<Map<String, List<Int>>>(emptyMap())
+    val onlineSongSequences: StateFlow<Map<String, List<Int>>> = _onlineSongSequences
 
     fun registerNavigationCallbacks(
         skipToNext: (Int, Boolean, String, (Int) -> Unit) -> Unit,
@@ -672,5 +677,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 playSong(song)
             }
         }
+    }
+
+    // Caching
+    fun cacheOnlineSongSequence(region: String, songs: List<OnlineSongResponse>) {
+        val songIds = songs.map { it.id }
+        val updatedSequences = _onlineSongSequences.value.toMutableMap()
+        updatedSequences[region] = songIds
+        _onlineSongSequences.value = updatedSequences
+    }
+    
+    // Caching
+    fun getOnlineSongSequence(region: String): List<Int> {
+        return _onlineSongSequences.value[region] ?: emptyList()
     }
 }

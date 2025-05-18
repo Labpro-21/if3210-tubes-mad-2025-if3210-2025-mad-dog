@@ -1,5 +1,6 @@
 package com.example.purrytify.ui.navigation
 
+import android.app.Application
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -11,6 +12,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
@@ -37,6 +39,7 @@ import com.example.purrytify.ui.screens.statistics.ListeningStatsScreen
 import com.example.purrytify.ui.screens.topsongs.TopSongsScreen
 import com.example.purrytify.ui.screens.topartist.TopArtistScreen
 import com.example.purrytify.ui.theme.SpotifyBlack
+import com.example.purrytify.ui.screens.songdetail.SongDetailViewModel
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
@@ -246,11 +249,24 @@ fun AppNavigation(
                         isOnline = false
                     )
                     
-                    val songDetailViewModel = androidx.lifecycle.viewmodel.compose.viewModel<com.example.purrytify.ui.screens.songdetail.SongDetailViewModel>()
+                    val songDetailViewModel = viewModel<SongDetailViewModel>(
+                        factory = SongDetailViewModel.Factory(
+                            application = LocalContext.current.applicationContext as Application,
+                            mainViewModel = mainViewModel
+                        )
+                    )
                     
                     LaunchedEffect(Unit) {
                         mainViewModel.registerNavigationCallbacks(
-                            skipToNext = songDetailViewModel::skipNext,
+                            skipToNext = { currentSongId, isOnline, currentRegion, onNavigate ->
+                                songDetailViewModel.skipNext(
+                                    currentSongId = currentSongId,
+                                    isOnline = isOnline,
+                                    currentRegion = currentRegion,
+                                    onNavigate = onNavigate,
+                                    isDailyPlaylist = false
+                                )
+                            },
                             skipToPrevious = songDetailViewModel::skipPrevious
                         )
                     }
@@ -272,11 +288,24 @@ fun AppNavigation(
                         region = region
                     )
                     
-                    val songDetailViewModel = androidx.lifecycle.viewmodel.compose.viewModel<com.example.purrytify.ui.screens.songdetail.SongDetailViewModel>()
+                    val songDetailViewModel = viewModel<SongDetailViewModel>(
+                        factory = SongDetailViewModel.Factory(
+                            application = LocalContext.current.applicationContext as Application,
+                            mainViewModel = mainViewModel
+                        )
+                    )
                     
                     LaunchedEffect(Unit) {
                         mainViewModel.registerNavigationCallbacks(
-                            skipToNext = songDetailViewModel::skipNext,
+                            skipToNext = { currentSongId, isOnline, currentRegion, onNavigate ->
+                                songDetailViewModel.skipNext(
+                                    currentSongId = currentSongId,
+                                    isOnline = isOnline,
+                                    currentRegion = currentRegion,
+                                    onNavigate = onNavigate,
+                                    isDailyPlaylist = false
+                                )
+                            },
                             skipToPrevious = songDetailViewModel::skipPrevious
                         )
                     }

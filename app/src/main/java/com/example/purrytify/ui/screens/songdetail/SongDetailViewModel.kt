@@ -5,7 +5,10 @@ import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.purrytify.MainViewModel
 import com.example.purrytify.data.auth.AuthRepository
 import com.example.purrytify.data.repository.OnlineSongRepository
 import com.example.purrytify.db.AppDatabase
@@ -25,7 +28,10 @@ import kotlinx.coroutines.withContext
 import java.util.Date
 import java.util.Locale
 
-class SongDetailViewModel(application: Application) : AndroidViewModel(application) {
+class SongDetailViewModel(
+    application: Application,
+    private val mainViewModel: MainViewModel? = null
+) : AndroidViewModel(application) {
 
     private val songDao = AppDatabase.getDatabase(application).songsDao()
     private val context = application.applicationContext
@@ -288,9 +294,31 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun skipNext(currentSongId: Int, isOnline: Boolean, currentRegion: String = "GLOBAL", onNavigate: (Int) -> Unit) {
+    // Modify the skipNext function to use cached sequences if available and match MainViewModel's expected signature
+    fun skipNext(currentSongId: Int, isOnline: Boolean, currentRegion: String = "GLOBAL", onNavigate: (Int) -> Unit, isDailyPlaylist: Boolean = false) {
         viewModelScope.launch {
             if (isOnline) {
+                // Try to get cached song sequence from injected MainViewModel
+                val cachedSongs = mainViewModel?.getOnlineSongSequence(currentRegion)
+                
+                if (!cachedSongs.isNullOrEmpty()) {
+                    // Use cached sequence if available
+                    Log.d(tag, "Using cached song sequence for region: $currentRegion")
+                    val currentIndex = cachedSongs.indexOf(currentSongId)
+                    if (currentIndex != -1 && currentIndex < cachedSongs.size - 1) {
+                        val nextSongId = cachedSongs[currentIndex + 1]
+                        onNavigate(nextSongId)
+                    } else {
+                        // Loop back to beginning
+                        if (cachedSongs.isNotEmpty()) {
+                            val firstSongId = cachedSongs.first()
+                            onNavigate(firstSongId)
+                        }
+                    }
+                    return@launch
+                }
+                
+                // Fall back to original implementation if cache not available
                 if (_onlineSongs.value.isEmpty()) {
                     val loaded = loadOnlineSongsSync(currentRegion) // Try to reload
                     if (!loaded) {
@@ -341,9 +369,31 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    // Modify the skipPrevious function to use cached sequences if available
     fun skipPrevious(currentSongId: Int, isOnline: Boolean, currentRegion: String = "GLOBAL", onNavigate: (Int) -> Unit) {
         viewModelScope.launch {
             if (isOnline) {
+                // Try to get cached song sequence from injected MainViewModel
+                val cachedSongs = mainViewModel?.getOnlineSongSequence(currentRegion)
+                
+                if (!cachedSongs.isNullOrEmpty()) {
+                    // Use cached sequence if available
+                    Log.d(tag, "Using cached song sequence for region: $currentRegion")
+                    val currentIndex = cachedSongs.indexOf(currentSongId)
+                    if (currentIndex > 0) {
+                        val previousSongId = cachedSongs[currentIndex - 1]
+                        onNavigate(previousSongId)
+                    } else {
+                        // Loop back to end
+                        if (cachedSongs.isNotEmpty()) {
+                            val lastSongId = cachedSongs.last()
+                            onNavigate(lastSongId)
+                        }
+                    }
+                    return@launch
+                }
+                
+                // Fall back to original implementation if cache not available
                 if (_onlineSongs.value.isEmpty()) {
                     val loaded = loadOnlineSongsSync(currentRegion) // Try to reload
                     if (!loaded) {
@@ -502,5 +552,19 @@ class SongDetailViewModel(application: Application) : AndroidViewModel(applicati
         data class Success(val song: Songs) : SongDetailUiState()
         data class Error(val message: String) : SongDetailUiState()
         object Empty : SongDetailUiState()
+    }
+
+    // Add a factory that can pass MainViewModel to SongDetailViewModel
+    class Factory(
+        private val application: Application,
+        private val mainViewModel: MainViewModel
+    ) : ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            if (modelClass.isAssignableFrom(SongDetailViewModel::class.java)) {
+                @Suppress("UNCHECKED_CAST")
+                return SongDetailViewModel(application, mainViewModel) as T
+            }
+            throw IllegalArgumentException("Unknown ViewModel class")
+        }
     }
 }
