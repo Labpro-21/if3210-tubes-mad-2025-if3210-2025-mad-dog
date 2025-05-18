@@ -206,14 +206,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     onSkipToPrevious = { songId -> skipPrevious(songId) },
                     onPlaybackFinished = {
                         _isPlaying.value = false
-                        // Don't reset the current song here - we still want to show it in mini player
-                        // _currentSong.value = null
-                        _songFinished.value = true // Set songFinished to true
-                        // Instead, just reset the position and keep mini player active
+                        _songFinished.value = true
                         _currentPosition.value = 0
 
-                        // Mini player should remain active to show the completed song
-                        //_isMiniPlayerActive.value = false
                     }
                 )
 
@@ -338,7 +333,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         
-        // If we're in a playlist, check if the song is in the current playlist
         if (mediaController?.playlist?.value?.isNotEmpty() == true) {
             val playlistSong = mediaController?.playlist?.value?.find { it.id == songId }
             if (playlistSong != null) {

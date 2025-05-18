@@ -33,6 +33,7 @@ import com.example.purrytify.ui.screens.profile.MapsPickerScreen
 import com.example.purrytify.ui.screens.profile.ProfileScreen
 import com.example.purrytify.ui.screens.setting.SettingScreen
 import com.example.purrytify.ui.screens.songdetail.SongDetailScreen
+import com.example.purrytify.ui.screens.statistics.ListeningStatsScreen
 import com.example.purrytify.ui.theme.SpotifyBlack
 
 sealed class Screen(val route: String) {
@@ -45,6 +46,7 @@ sealed class Screen(val route: String) {
     object Album: Screen("album/{region}")
     object EditProfile : Screen("editProfile")
     object LocationPicker : Screen("locationPicker")
+    object ListeningStats: Screen("listeningstats")
 }
 
 @Composable
@@ -149,6 +151,9 @@ fun AppNavigation(
                         },
                         onNavigateToEditProfile = {
                             navController.navigate(Screen.EditProfile.route)
+                        },
+                        onNavigateToListeningStats = {
+                            navController.navigate(Screen.ListeningStats.route)
                         }
                     )
                     
@@ -195,10 +200,17 @@ fun AppNavigation(
                 }
                 composable(Screen.Settings.route) {
                     SettingScreen(
+                        onLogout = onLogout,
                         onNavigateBack = {
                             navController.popBackStack()
-                        },
-                        onLogout = onLogout
+                        }
+                    )
+                }
+                composable(Screen.ListeningStats.route) {
+                    ListeningStatsScreen(
+                        onNavigateBack = {
+                            navController.popBackStack()
+                        }
                     )
                 }
                 composable(

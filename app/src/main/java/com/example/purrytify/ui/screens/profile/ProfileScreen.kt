@@ -48,14 +48,15 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberAsyncImagePainter
 import com.example.purrytify.R
-import com.example.purrytify.ui.screens.soundcapsule.SoundCapsuleCard // Pastikan path sudah benar
+import com.example.purrytify.ui.screens.soundcapsule.SoundCapsuleCard
 import com.example.purrytify.ui.theme.SpotifyGreen
 
 @Composable
 fun ProfileScreen(
     viewModel: ProfileViewModel = viewModel(),
     onNavigateToSettings: () -> Unit = {},
-    onNavigateToEditProfile: () -> Unit = {}
+    onNavigateToEditProfile: () -> Unit = {},
+    onNavigateToListeningStats: () -> Unit = {}
 ) {
     val profile by viewModel.profile.collectAsState()
     val songsCount by viewModel.songsCount.collectAsState()
@@ -199,7 +200,10 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Panggil composable SoundCapsuleCard di sini
-                SoundCapsuleCard(soundCapsule = soundCapsuleData)
+                SoundCapsuleCard(
+                    soundCapsule = soundCapsuleData,
+                    onTimeListenedClick = onNavigateToListeningStats
+                )
             }
         }
     }

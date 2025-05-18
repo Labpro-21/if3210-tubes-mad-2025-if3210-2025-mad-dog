@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -29,9 +31,13 @@ import coil.compose.AsyncImage
 import com.example.purrytify.R
 import com.example.purrytify.db.dao.ListeningActivityDao
 import java.util.concurrent.TimeUnit
+import androidx.compose.foundation.clickable
 
 @Composable
-fun SoundCapsuleCard(soundCapsule: ListeningActivityDao.SoundCapsule?) {
+fun SoundCapsuleCard(
+    soundCapsule: ListeningActivityDao.SoundCapsule?,
+    onTimeListenedClick: () -> Unit = {}
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -65,17 +71,20 @@ fun SoundCapsuleCard(soundCapsule: ListeningActivityDao.SoundCapsule?) {
 
                 // Row 1: Time Listened Card (Full Width)
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onTimeListenedClick() },
                     shape = RoundedCornerShape(8.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFF212121) // Warna abu-abu gelap
+                        containerColor = Color(0xFF212121)
                     )
                 ) {
                     DetailRow(
                         label = "Time listened",
                         value = "${TimeUnit.MILLISECONDS.toMinutes(soundCapsule.totalTimeListened)} minutes",
                         useLargerIcon = true,
-                        textColor = Color.White // Sesuaikan warna teks jika perlu
+                        textColor = Color.White,
+                        showArrow = true
                     )
                 }
                 Spacer(modifier = Modifier.height(12.dp))
@@ -141,35 +150,50 @@ fun DetailRow(
     value: String,
     iconId: Int? = null,
     useLargerIcon: Boolean = false,
-    textColor: Color
+    textColor: Color,
+    showArrow: Boolean = false
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        if (iconId != null) {
-            Icon(
-                painter = painterResource(id = iconId),
-                contentDescription = label,
-                tint = textColor,
-                modifier = Modifier.size(if (useLargerIcon) 36.dp else 24.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (iconId != null) {
+                Icon(
+                    painter = painterResource(id = iconId),
+                    contentDescription = label,
+                    tint = textColor,
+                    modifier = Modifier.size(if (useLargerIcon) 36.dp else 24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            Column {
+                Text(
+                    text = label,
+                    fontWeight = FontWeight.Medium,
+                    color = textColor.copy(alpha = 0.7f),
+                    fontSize = 14.sp
+                )
+                Text(
+                    text = value,
+                    color = Color(0xFF4CAF50),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
-        Column {
-            Text(
-                text = label,
-                fontWeight = FontWeight.Medium,
-                color = textColor.copy(alpha = 0.7f),
-                fontSize = 14.sp
-            )
-            Text(
-                text = value,
-                color = Color(0xFF4CAF50), // Warna hijau
-                fontSize = 20.sp, // Ukuran lebih besar
-                fontWeight = FontWeight.Bold // Tebal
+        
+        if (showArrow) {
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = "View details",
+                tint = textColor.copy(alpha = 0.7f),
+                modifier = Modifier.size(24.dp)
             )
         }
     }

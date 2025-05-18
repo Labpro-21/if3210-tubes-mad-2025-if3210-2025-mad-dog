@@ -65,4 +65,8 @@ class ListeningActivityRepository private constructor(
     suspend fun getSoundCapsuleData(userId: Int): ListeningActivityDao.SoundCapsule {
         return listeningActivityDao.getSoundCapsuleData(userId)
     }
+
+    suspend fun getDailyListeningData(userId: Int): List<ListeningActivityDao.DailyListeningStats>{
+        return listeningActivityDao.getDailyListeningStatsLastMonth(userId)
+    }
 }

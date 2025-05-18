@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
@@ -51,7 +53,7 @@ fun HomeScreen(
     Log.d("Init home new songs: ", "$newAddedSongs")
     Log.d("USER ID INIT: ", "${homeViewModel.userId}")
 
-    
+
     LaunchedEffect(dailyPlayList.isEmpty()) {
         if (dailyPlayList.isEmpty()) {
             homeViewModel.loadDailyPlaylist()
@@ -79,11 +81,13 @@ fun HomeScreenContent(
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = if (isLandscape) 8.dp else 16.dp),
+            .padding(horizontal = if (isLandscape) 8.dp else 16.dp)
+            .verticalScroll(scrollState), // Add vertical scrolling
     ) {
         Spacer(modifier = Modifier.height(if (isLandscape) 0.dp else 8.dp))
         //TopBar(isLandscape = isLandscape)
@@ -124,14 +128,13 @@ fun HomeScreenContent(
                 color = Color.White
             )
             Spacer(modifier = Modifier.height(16.dp))
-            ChartSection(onNavigate,isLandscape =false)
-            Log.d("Daily","$dailyPlayList");
+            ChartSection(onNavigate, isLandscape = false)
+            Log.d("Daily","$dailyPlayList")
 
             if (dailyPlayList.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(24.dp))
                 DailyPlaylistCard(dailyPlayList) {
-                    
-                     onNavigate("album/GLOBAL?isDailyPlaylist=true")
+                    onNavigate("album/GLOBAL?isDailyPlaylist=true")
                 }
                 Spacer(modifier = Modifier.height(24.dp))
             }
@@ -154,11 +157,25 @@ fun HomeScreenContent(
                     color = Color.White
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                RecentlyPlayedSectionPortrait(recentlyPlayedSongs, onNavigate)
+                // Modified section for scrolling fix
+                RecentlyPlayedSectionPortraitNonScrollable(recentlyPlayedSongs, onNavigate)
             }
         }
 
-        Spacer(modifier = Modifier.height(if (isLandscape) 8.dp else 16.dp)) // Reduce bottom spacer
+        Spacer(modifier = Modifier.height(if (isLandscape) 8.dp else 16.dp))
+    }
+}
+
+// Modified to use Column instead of LazyColumn for better parent scrolling experience
+@Composable
+fun RecentlyPlayedSectionPortraitNonScrollable(recentlyPlayedSongs: List<RecentlyPlayedWithSong>, onNavigate: (String) -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        recentlyPlayedSongs.forEach { recentlyPlayedWithSong ->
+            SongItemPortrait(recentlyPlayedWithSong.song, onNavigate)
+            Spacer(modifier = Modifier.height(8.dp))
+        }
     }
 }
 
@@ -255,6 +272,7 @@ fun RecentlyPlayedSectionLandscape(recentlyPlayedSongs: List<RecentlyPlayedWithS
     }
 }
 
+// Keep this for reference/compatibility with other parts of the app
 @Composable
 fun RecentlyPlayedSectionPortrait(recentlyPlayedSongs: List<RecentlyPlayedWithSong>, onNavigate: (String) -> Unit) {
     LazyColumn(
@@ -288,8 +306,8 @@ fun ChartSection(onNavigate: (String) -> Unit, isLandscape: Boolean){
         Triple("CH", "Switzerland", R.drawable.top50ch),
         Triple("DE", "Germany", R.drawable.top50de),
         Triple("BR", "Brazil", R.drawable.top50br),
-        
-    )
+
+        )
 
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 8.dp else 16.dp)

@@ -38,9 +38,10 @@ interface ListeningActivityDao {
         FROM listening_activity
         WHERE userId = :userId
         AND strftime('%Y-%m', startTime / 1000, 'unixepoch', 'localtime') = strftime('%Y-%m', 'now', 'localtime')
-        AND completed = 1
+        
         """
     )
+    //AND completed = 1
     fun getTotalListeningTimeThisMonth(userId: Int): Long
 
     // Changed return type to TopArtist data class instead of String
@@ -166,4 +167,25 @@ interface ListeningActivityDao {
         val listeningDayStreak: Int,
         val monthYear: String // Added property for month and year
     )
+
+    // Data class to hold daily listening statistics
+    data class DailyListeningStats(
+        val date: String,  // Format: YYYY-MM-DD
+        val totalMinutes: Double,  // Duration in minutes
+    )
+
+    @Query("""
+        SELECT 
+            DATE(startTime / 1000, 'unixepoch', 'localtime') as date,
+            ROUND(CAST(SUM(duration) AS FLOAT) / 60000.0, 2) as totalMinutes
+        FROM listening_activity
+        WHERE userId = :userId
+        
+        AND startTime >= strftime('%s000', 'now', '-30 days')
+        AND startTime <= strftime('%s000', 'now')
+        GROUP BY DATE(startTime / 1000, 'unixepoch', 'localtime')
+        ORDER BY date ASC
+    """)
+    //AND completed = 1
+    suspend fun getDailyListeningStatsLastMonth(userId: Int): List<DailyListeningStats>
 }
