@@ -124,7 +124,11 @@ fun SongDetailScreen(
 */
     LaunchedEffect(songId, isOnline, region) {
         mainViewModel.setIsOnlineSong(isOnline)
-        viewModel.loadSongDetails(songId, isOnline = isOnline, region = region,isDailyPlaylist = isDailyPlaylist    )
+        if (isOnline && region == "GLOBAL") {
+            viewModel.fetchSongByDeepLink(songId)
+        } else {
+            viewModel.loadSongDetails(songId, isOnline = isOnline, region = region, isDailyPlaylist = isDailyPlaylist)
+        }
     }
     LaunchedEffect(isUpdateSuccessful) {
         if (isUpdateSuccessful) {
@@ -172,7 +176,7 @@ fun SongDetailScreen(
                         audioOutputViewModel.scanDevices()
                         showDeviceDialog = true
                     }
-                }
+                },
                 isDailyPlaylist = isDailyPlaylist
             )
             if (showEditDialog) {
@@ -231,7 +235,23 @@ fun SongDetailScreen(
             }
         }
         is SongDetailViewModel.SongDetailUiState.Error -> {
-            Text((uiState as SongDetailViewModel.SongDetailUiState.Error).message, color = Color.Red)
+            val errorMessage = (uiState as SongDetailViewModel.SongDetailUiState.Error).message
+            val context = LocalContext.current
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text("Failed to Load Song") },
+                text = { Text(errorMessage) },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.loadSongDetails(songId, isOnline = isOnline, region = region, isDailyPlaylist = isDailyPlaylist) }) {
+                        Text("Retry")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { navController.popBackStack() }) {
+                        Text("Back")
+                    }
+                }
+            )
         }
         SongDetailViewModel.SongDetailUiState.Empty -> {
             // Handle empty state if needed
@@ -326,8 +346,8 @@ fun SongDetailsContent(
     isOnline: Boolean,
     currentRegion: String,
     selectedDevice: AudioOutputDevice?,
-    onShowDeviceDialog: () -> Unit
-    isDailyPlaylist: Boolean,
+    onShowDeviceDialog: () -> Unit,
+    isDailyPlaylist: Boolean
 ) {
     val currentPosition by mainViewModel.currentPosition.collectAsState()
     val isPlaying by mainViewModel.isPlaying.collectAsState()
@@ -625,6 +645,21 @@ fun SongDetailsContent(
                             text = selectedDevice?.name ?: "Internal Speaker",
                             color = if (selectedDevice != null) Color.Green else Color.Gray,
                             fontSize = 14.sp
+                        )
+                    }
+                }
+                if (isOnline) {
+                    val context = LocalContext.current
+                    IconButton(onClick = {
+                        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND)
+                        shareIntent.type = "text/plain"
+                        shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, "purrytify://song/${song.id}")
+                        context.startActivity(android.content.Intent.createChooser(shareIntent, null))
+                    }) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_share),
+                            contentDescription = "Share Song",
+                            tint = Color.White
                         )
                     }
                 }

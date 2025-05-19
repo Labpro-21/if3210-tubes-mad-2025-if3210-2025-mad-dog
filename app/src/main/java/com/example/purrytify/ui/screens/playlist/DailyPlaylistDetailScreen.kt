@@ -10,10 +10,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
+import com.example.purrytify.R
 import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.MainViewModel
 
@@ -64,9 +67,22 @@ fun DailyPlaylistDetailScreen(
                             .clip(MaterialTheme.shapes.medium)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(song.name, color = Color.White, fontWeight = FontWeight.Bold)
                         Text(song.artist, color = Color.Gray)
+                    }
+                    val context = LocalContext.current
+                    IconButton(onClick = {
+                        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND)
+                        shareIntent.type = "text/plain"
+                        shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, "purrytify://song/${song.id}")
+                        context.startActivity(android.content.Intent.createChooser(shareIntent, null))
+                    }) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_share),
+                            contentDescription = "Share Song",
+                            tint = Color.White
+                        )
                     }
                 }
             }

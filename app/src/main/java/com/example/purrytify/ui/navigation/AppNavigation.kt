@@ -21,6 +21,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.navigation.navDeepLink
 import com.example.purrytify.MainViewModel
 import com.example.purrytify.ui.components.BottomNavigationBar
 import com.example.purrytify.ui.components.LeftNavigationBar
@@ -274,8 +275,13 @@ fun AppNavigation(
                 composable(
                     Screen.SongDetailOnline.route,
                     arguments = listOf(
-                        navArgument("region") { type = NavType.StringType },
+                        navArgument("region") { type = NavType.StringType; defaultValue = "GLOBAL" },
                         navArgument("songId") { type = NavType.IntType }
+                    ),
+                    deepLinks = listOf(
+                        navDeepLink {
+                            uriPattern = "purrytify://song/{songId}"
+                        }
                     )
                 ) { backStackEntry ->
                     val region = backStackEntry.arguments?.getString("region") ?: "GLOBAL"
@@ -287,14 +293,12 @@ fun AppNavigation(
                         isOnline = true,
                         region = region
                     )
-                    
                     val songDetailViewModel = viewModel<SongDetailViewModel>(
                         factory = SongDetailViewModel.Factory(
                             application = LocalContext.current.applicationContext as Application,
                             mainViewModel = mainViewModel
                         )
                     )
-                    
                     LaunchedEffect(Unit) {
                         mainViewModel.registerNavigationCallbacks(
                             skipToNext = { currentSongId, isOnline, currentRegion, onNavigate ->

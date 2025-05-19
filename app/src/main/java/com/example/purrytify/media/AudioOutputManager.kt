@@ -5,8 +5,11 @@ import android.bluetooth.BluetoothDevice
 import android.content.Context
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
 import android.os.Build
-import android.os.Build as AndroidBuild
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.example.purrytify.data.model.AudioOutputDevice
 import com.example.purrytify.data.model.AudioOutputDeviceType
@@ -16,152 +19,105 @@ class AudioOutputManager(private val context: Context) {
     private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
 
     fun getAvailableAudioDevices(): List<AudioOutputDevice> {
-        val rawDevices = mutableListOf<AudioOutputDevice>()
-        val btAddresses = mutableSetOf<String>()
-        var speakerAdded = false
-        val btNameToAddress = mutableMapOf<String, String>()
-        val isBluetoothA2dpOn = audioManager.isBluetoothA2dpOn
-        var bluetoothDeviceName: String? = null
-        if (isBluetoothA2dpOn) {
-            bluetoothDeviceName = bluetoothAdapter?.bondedDevices?.firstOrNull { isBluetoothDeviceConnected(it) }?.name
-        }
+        val devices = mutableListOf<AudioOutputDevice>()
+        val btDevices = mutableSetOf<String>()
+
+        // Always add phone speaker, but mark it as connected only if Bluetooth is inactive
+        val isBluetoothActive = audioManager.isBluetoothA2dpOn || audioManager.isBluetoothScoOn
+        devices.add(AudioOutputDevice(
+            id = "PHONE_SPEAKER",
+            name = "Phone Speaker",
+            type = AudioOutputDeviceType.SPEAKER,
+            isConnected = !isBluetoothActive // Speaker is connected if Bluetooth is off
+        ))
+
+        // Add Bluetooth devices
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val audioDevices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-            for (device in audioDevices) {
-                val type = when (device.type) {
-                    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> AudioOutputDeviceType.BLUETOOTH
-                    AudioDeviceInfo.TYPE_WIRED_HEADPHONES, AudioDeviceInfo.TYPE_WIRED_HEADSET -> AudioOutputDeviceType.WIRELESS_HEADSET
-                    AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> AudioOutputDeviceType.SPEAKER
-                    else -> AudioOutputDeviceType.OTHER
-                }
-                val name = device.productName?.toString() ?: "Unknown"
-                if (type == AudioOutputDeviceType.BLUETOOTH) {
-                    bluetoothAdapter?.bondedDevices?.forEach { bt ->
-                        if (bt.name == name) {
-                            btNameToAddress[name] = bt.address
-                        }
-                    }
-                }
-                if (type == AudioOutputDeviceType.SPEAKER && !speakerAdded) {
-                    if (isBluetoothA2dpOn && bluetoothDeviceName != null) {
-                        rawDevices.add(
-                            AudioOutputDevice(
-                                id = "BT_FAKE",
-                                name = "$bluetoothDeviceName (Bluetooth)",
-                                type = AudioOutputDeviceType.BLUETOOTH,
-                                isConnected = true
-                            )
-                        )
-                    } else {
-                        rawDevices.add(
-                            AudioOutputDevice(
-                                id = "SPEAKER",
-                                name = "Internal Speaker",
-                                type = type,
-                                isConnected = device.isSink
-                            )
-                        )
-                    }
-                    speakerAdded = true
-                } else if (type == AudioOutputDeviceType.BLUETOOTH) {
-                    val address = btNameToAddress[name] ?: name
-                    if (!btAddresses.contains(address)) {
-                        rawDevices.add(
-                            AudioOutputDevice(
-                                id = "BT_$address",
-                                name = "$name (Bluetooth)",
-                                type = type,
-                                isConnected = device.isSink
-                            )
-                        )
-                        btAddresses.add(address)
-                    }
-                } else if (type != AudioOutputDeviceType.SPEAKER) {
-                    rawDevices.add(
-                        AudioOutputDevice(
-                            id = "${type}_${name}_${device.id}",
-                            name = "$name (${type.name})",
-                            type = type,
-                            isConnected = device.isSink
-                        )
-                    )
-                }
-            }
-        }
-        if (!speakerAdded && !isBluetoothA2dpOn) {
-            rawDevices.add(
-                AudioOutputDevice(
-                    id = "SPEAKER",
-                    name = "Internal Speaker",
-                    type = AudioOutputDeviceType.SPEAKER,
-                    isConnected = true
-                )
-            )
-        }
-        bluetoothAdapter?.bondedDevices?.forEach { btDevice ->
-            if (isBluetoothDeviceConnected(btDevice)) {
-                if (!btAddresses.contains(btDevice.address)) {
-                    rawDevices.add(
-                        AudioOutputDevice(
-                            id = "BT_${btDevice.address}",
-                            name = "${btDevice.name ?: "Bluetooth Device"} (Bluetooth)",
+            audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).forEach { device ->
+                if (device.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO || 
+                    device.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP) {
+                    val name = device.productName?.toString() ?: "Bluetooth"
+                    if (!btDevices.contains(name)) {
+                        devices.add(AudioOutputDevice(
+                            id = "BT_${device.id}",
+                            name = name,
                             type = AudioOutputDeviceType.BLUETOOTH,
-                            isConnected = true
-                        )
-                    )
-                    btAddresses.add(btDevice.address)
+                            isConnected = device.isSink
+                        ))
+                        btDevices.add(name)
+                    }
                 }
             }
         }
-        val deduped = mutableMapOf<Pair<String, AudioOutputDeviceType>, AudioOutputDevice>()
-        for (dev in rawDevices) {
-            val key = dev.name to dev.type
-            if (!deduped.containsKey(key)) {
-                deduped[key] = dev
-            } else {
-                val existing = deduped[key]!!
-                if (existing.type == AudioOutputDeviceType.OTHER && (dev.type == AudioOutputDeviceType.SPEAKER || dev.type == AudioOutputDeviceType.BLUETOOTH)) {
-                    deduped[key] = dev
-                }
-            }
-        }
-        val result = deduped.values.toList().toMutableList()
-        if (result.isEmpty()) {
-            result.add(
-                AudioOutputDevice(
-                    id = "SPEAKER",
-                    name = "Internal Speaker",
-                    type = AudioOutputDeviceType.SPEAKER,
-                    isConnected = true
-                )
-            )
-        }
-        Log.d("AudioOutputManager", "Returning devices: $result")
-        return result
+
+        return devices
     }
 
     fun setAudioOutput(device: AudioOutputDevice) {
-        if (device.type == AudioOutputDeviceType.BLUETOOTH) {
-            audioManager.setSpeakerphoneOn(false)
-            audioManager.startBluetoothSco()
-            audioManager.isBluetoothScoOn = true
-        } else if (device.type == AudioOutputDeviceType.SPEAKER) {
-            audioManager.stopBluetoothSco()
-            audioManager.isBluetoothScoOn = false
-            audioManager.setSpeakerphoneOn(true)
-            audioManager.mode = AudioManager.MODE_NORMAL
-        } else {
-            audioManager.stopBluetoothSco()
-            audioManager.isBluetoothScoOn = false
-            audioManager.setSpeakerphoneOn(false)
+        when (device.type) {
+            AudioOutputDeviceType.BLUETOOTH -> {
+                // 1. Disable speaker first
+                audioManager.isSpeakerphoneOn = false
+                audioManager.setSpeakerphoneOn(false)
+
+                // 2. Enable Bluetooth
+                audioManager.mode = AudioManager.MODE_NORMAL
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    audioManager.clearCommunicationDevice()
+                    audioManager.availableCommunicationDevices
+                        .firstOrNull { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
+                        ?.let { audioManager.setCommunicationDevice(it) }
+                } else {
+                    @Suppress("DEPRECATION")
+                    audioManager.startBluetoothSco()
+                    @Suppress("DEPRECATION")
+                    audioManager.isBluetoothScoOn = true
+                }
+                audioManager.setParameters("audio_output=bluetooth")
+            }
+            else -> { // For SPEAKER
+                // 1. Disable Bluetooth completely
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    audioManager.clearCommunicationDevice()
+                }
+                @Suppress("DEPRECATION")
+                audioManager.stopBluetoothSco()
+                @Suppress("DEPRECATION")
+                audioManager.isBluetoothScoOn = false
+                audioManager.setParameters("bluetooth_sco=off")
+                audioManager.setParameters("bluetooth_enabled=false")
+
+                // 2. Force speaker mode
+                audioManager.mode = AudioManager.MODE_NORMAL
+                audioManager.isSpeakerphoneOn = true
+                audioManager.setSpeakerphoneOn(true)
+                audioManager.setParameters("audio_output=speaker")
+
+                // 3. Disable Bluetooth at the adapter level (requires BLUETOOTH_ADMIN permission)
+                try {
+                    bluetoothAdapter?.disable()
+                } catch (e: SecurityException) {
+                    Log.e("AudioOutputManager", "BLUETOOTH_ADMIN permission missing", e)
+                }
+            }
         }
     }
 
     fun routeToSpeaker() {
-        audioManager.stopBluetoothSco()
-        audioManager.isBluetoothScoOn = false
-        audioManager.setSpeakerphoneOn(true)
         audioManager.mode = AudioManager.MODE_NORMAL
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            audioManager.availableCommunicationDevices.firstOrNull {
+                it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
+            }?.let { speaker ->
+                audioManager.setCommunicationDevice(speaker)
+            } ?: run {
+                audioManager.isSpeakerphoneOn = true
+            }
+        } else {
+            audioManager.stopBluetoothSco()
+            audioManager.isBluetoothScoOn = false
+            audioManager.isSpeakerphoneOn = true
+        }
     }
 
     private fun isBluetoothDeviceConnected(device: BluetoothDevice): Boolean {
@@ -172,4 +128,4 @@ class AudioOutputManager(private val context: Context) {
             false
         }
     }
-} 
+}

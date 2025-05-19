@@ -543,6 +543,35 @@ class SongDetailViewModel(
         _isOnline.value = online
     }
 
+    fun fetchSongByDeepLink(songId: Int) {
+        viewModelScope.launch {
+            _songDetails.value = SongDetailUiState.Loading
+            try {
+                val onlineSong = onlineSongRepository.getSongById(songId)
+                if (onlineSong != null) {
+                    val song = Songs(
+                        id = onlineSong.id,
+                        name = onlineSong.title,
+                        artist = onlineSong.artist,
+                        artwork = onlineSong.artwork,
+                        description = onlineSong.country,
+                        filePath = onlineSong.url,
+                        duration = MediaUtils.parseDuration(onlineSong.duration),
+                        isFavorite = false,
+                        userId = authRepository.currentUserId ?: 0,
+                        uploadDate = Date()
+                    )
+                    _songDetails.value = SongDetailUiState.Success(song)
+                } else {
+                    _songDetails.value = SongDetailUiState.Error("Failed to fetch song from server")
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "Error fetching song by deep link", e)
+                _songDetails.value = SongDetailUiState.Error("Error fetching song: ${e.message}")
+            }
+        }
+    }
+
     companion object {
         private const val TAG = "DownloadSingleSong"
     }
