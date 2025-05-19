@@ -18,4 +18,10 @@ interface OnlineSongApi {
         @Header("Authorization") token: String,
         @Path("country_code") countryCode: String
     ): Response<List<OnlineSongResponse>>
+
+    @GET("/api/songs/{id}")
+    suspend fun getSongById(
+        @Header("Authorization") token: String,
+        @Path("id") songId: Int
+    ): Response<OnlineSongResponse>
 }

@@ -275,7 +275,7 @@ fun AppNavigation(
                 composable(
                     Screen.SongDetailOnline.route,
                     arguments = listOf(
-                        navArgument("region") { type = NavType.StringType },
+                        navArgument("region") { type = NavType.StringType; defaultValue = "GLOBAL" },
                         navArgument("songId") { type = NavType.IntType }
                     ),
                     deepLinks = listOf(

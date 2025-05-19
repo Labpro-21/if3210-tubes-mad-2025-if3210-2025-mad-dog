@@ -124,7 +124,11 @@ fun SongDetailScreen(
 */
     LaunchedEffect(songId, isOnline, region) {
         mainViewModel.setIsOnlineSong(isOnline)
-        viewModel.loadSongDetails(songId, isOnline = isOnline, region = region,isDailyPlaylist = isDailyPlaylist    )
+        if (isOnline && region == "GLOBAL") {
+            viewModel.fetchSongByDeepLink(songId)
+        } else {
+            viewModel.loadSongDetails(songId, isOnline = isOnline, region = region, isDailyPlaylist = isDailyPlaylist)
+        }
     }
     LaunchedEffect(isUpdateSuccessful) {
         if (isUpdateSuccessful) {
@@ -172,7 +176,7 @@ fun SongDetailScreen(
                         audioOutputViewModel.scanDevices()
                         showDeviceDialog = true
                     }
-                }
+                },
                 isDailyPlaylist = isDailyPlaylist
             )
             if (showEditDialog) {
@@ -342,8 +346,8 @@ fun SongDetailsContent(
     isOnline: Boolean,
     currentRegion: String,
     selectedDevice: AudioOutputDevice?,
-    onShowDeviceDialog: () -> Unit
-    isDailyPlaylist: Boolean,
+    onShowDeviceDialog: () -> Unit,
+    isDailyPlaylist: Boolean
 ) {
     val currentPosition by mainViewModel.currentPosition.collectAsState()
     val isPlaying by mainViewModel.isPlaying.collectAsState()
@@ -653,7 +657,7 @@ fun SongDetailsContent(
                         context.startActivity(android.content.Intent.createChooser(shareIntent, null))
                     }) {
                         Icon(
-                            painter = painterResource(id = com.example.purrytify.R.drawable.ic_share),
+                            painter = painterResource(id = R.drawable.ic_share),
                             contentDescription = "Share Song",
                             tint = Color.White
                         )

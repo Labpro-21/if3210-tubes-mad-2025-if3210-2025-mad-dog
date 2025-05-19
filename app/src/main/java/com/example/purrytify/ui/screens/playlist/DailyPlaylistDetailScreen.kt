@@ -71,20 +71,18 @@ fun DailyPlaylistDetailScreen(
                         Text(song.name, color = Color.White, fontWeight = FontWeight.Bold)
                         Text(song.artist, color = Color.Gray)
                     }
-                    if (song.url != null) {
-                        val context = LocalContext.current
-                        IconButton(onClick = {
-                            val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND)
-                            shareIntent.type = "text/plain"
-                            shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, "purrytify://song/${song.id}")
-                            context.startActivity(android.content.Intent.createChooser(shareIntent, null))
-                        }) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_share),
-                                contentDescription = "Share Song",
-                                tint = Color.White
-                            )
-                        }
+                    val context = LocalContext.current
+                    IconButton(onClick = {
+                        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND)
+                        shareIntent.type = "text/plain"
+                        shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, "purrytify://song/${song.id}")
+                        context.startActivity(android.content.Intent.createChooser(shareIntent, null))
+                    }) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_share),
+                            contentDescription = "Share Song",
+                            tint = Color.White
+                        )
                     }
                 }
             }

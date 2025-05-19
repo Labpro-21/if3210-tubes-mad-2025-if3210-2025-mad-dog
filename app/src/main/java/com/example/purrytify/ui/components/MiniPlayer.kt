@@ -41,6 +41,8 @@ import coil.imageLoader
 import com.example.purrytify.ui.theme.SpotifyBlack
 import kotlin.math.max
 import kotlin.math.min
+import androidx.compose.ui.res.painterResource
+import com.example.purrytify.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -230,11 +232,10 @@ fun MiniPlayer(mainViewModel: MainViewModel, onMiniPlayerClick: () -> Unit, modi
                             shareIntent.type = "text/plain"
                             shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, "purrytify://song/${song.id}")
                             context.startActivity(android.content.Intent.createChooser(shareIntent, null))
-                        },
-                        modifier = Modifier.align(Alignment.CenterEnd)
+                        }
                     ) {
                         Icon(
-                            painter = painterResource(id = com.example.purrytify.R.drawable.ic_share),
+                            painter = painterResource(id = R.drawable.ic_share),
                             contentDescription = "Share Song",
                             tint = Color.White
                         )

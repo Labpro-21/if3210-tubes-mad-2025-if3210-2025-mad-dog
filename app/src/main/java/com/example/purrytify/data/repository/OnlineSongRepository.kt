@@ -48,6 +48,27 @@ class OnlineSongRepository private constructor(
         return@withContext null
     }
 
+    suspend fun getSongById(songId: Int): OnlineSongResponse? = withContext(Dispatchers.IO) {
+        val token = tokenManager.getAccessToken()
+        Log.d(tag, "Fetching song by ID $songId with token: $token")
+        if (token != null) {
+            try {
+                val response = api.getSongById("Bearer $token", songId)
+                Log.d(tag, "Song by ID API response code: ${response.code()}")
+                if (response.isSuccessful) {
+                    return@withContext response.body()
+                } else {
+                    Log.d(tag, "Unsuccessful response: ${response.errorBody()?.string()}")
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "Error fetching song by ID: ${e.localizedMessage}", e)
+            }
+        } else {
+            Log.d(tag, "Token is null, cannot fetch song by ID")
+        }
+        return@withContext null
+    }
+
     private fun handleResponse(response: retrofit2.Response<List<OnlineSongResponse>>): List<OnlineSongResponse>? {
         if (response.isSuccessful) {
             val songs = response.body() ?: emptyList()
