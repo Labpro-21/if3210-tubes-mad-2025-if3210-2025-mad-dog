@@ -1,5 +1,7 @@
 package com.example.purrytify
 
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -32,13 +34,39 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         NetworkMonitor.initialize(applicationContext)
+        
+        // Handle deep link if app was launched from one
+        intent?.let { handleDeepLink(it) }
+        
         setContent {
             PurrytifyTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AppContent() // Tidak perlu meneruskan NetworkMonitor
+                    AppContent()
+                }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // Handle deep link if app was already running
+        handleDeepLink(intent)
+    }
+
+    private fun handleDeepLink(intent: Intent) {
+        val uri = intent.data
+        if (uri != null && uri.scheme == "purrytify" && uri.host == "song") {
+            val songId = uri.lastPathSegment?.toIntOrNull()
+            if (songId != null) {
+                // Store both songId and isOnline flag
+                val sharedPref = getSharedPreferences("DeepLinkPrefs", Context.MODE_PRIVATE)
+                with(sharedPref.edit()) {
+                    putInt("deepLinkSongId", songId)
+                    putBoolean("deepLinkIsOnline", true) // Assume online songs for deep links
+                    apply()
                 }
             }
         }
@@ -46,7 +74,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        NetworkMonitor.unregisterNetworkCallback(applicationContext) // Unregister Singleton di onDestroy
+        NetworkMonitor.unregisterNetworkCallback(applicationContext)
     }
 }
 

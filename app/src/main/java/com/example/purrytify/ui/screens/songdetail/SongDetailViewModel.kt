@@ -562,12 +562,13 @@ class SongDetailViewModel(
                         uploadDate = Date()
                     )
                     _songDetails.value = SongDetailUiState.Success(song)
+                    setCurrentOnlineSongId(songId) // Important for download tracking
                 } else {
-                    _songDetails.value = SongDetailUiState.Error("Failed to fetch song from server")
+                    _songDetails.value = SongDetailUiState.Error("Song not found on server")
                 }
             } catch (e: Exception) {
                 Log.e(tag, "Error fetching song by deep link", e)
-                _songDetails.value = SongDetailUiState.Error("Error fetching song: ${e.message}")
+                _songDetails.value = SongDetailUiState.Error("Connection error: ${e.message}")
             }
         }
     }

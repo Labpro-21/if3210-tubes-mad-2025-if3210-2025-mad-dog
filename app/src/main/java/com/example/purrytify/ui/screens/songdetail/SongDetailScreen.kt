@@ -149,7 +149,26 @@ fun SongDetailScreen(
 
     when (uiState) {
         SongDetailViewModel.SongDetailUiState.Loading -> {
-            Text("Loading...", color = Color.White)
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        }
+        is SongDetailViewModel.SongDetailUiState.Error -> {
+            val errorMessage = (uiState as SongDetailViewModel.SongDetailUiState.Error).message
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(text = "Failed to load song", color = Color.White)
+                    Text(text = errorMessage, color = Color.Gray)
+                    Button(
+                        onClick = { 
+                            viewModel.loadSongDetails(songId, isOnline, region) 
+                        },
+                        modifier = Modifier.padding(top = 16.dp)
+                    ) {
+                        Text("Retry")
+                    }
+                }
+            }
         }
         is SongDetailViewModel.SongDetailUiState.Success -> {
             SongDetailsContent(
@@ -233,25 +252,6 @@ fun SongDetailScreen(
                     onRefresh = { audioOutputViewModel.scanDevices() }
                 )
             }
-        }
-        is SongDetailViewModel.SongDetailUiState.Error -> {
-            val errorMessage = (uiState as SongDetailViewModel.SongDetailUiState.Error).message
-            val context = LocalContext.current
-            AlertDialog(
-                onDismissRequest = {},
-                title = { Text("Failed to Load Song") },
-                text = { Text(errorMessage) },
-                confirmButton = {
-                    TextButton(onClick = { viewModel.loadSongDetails(songId, isOnline = isOnline, region = region, isDailyPlaylist = isDailyPlaylist) }) {
-                        Text("Retry")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { navController.popBackStack() }) {
-                        Text("Back")
-                    }
-                }
-            )
         }
         SongDetailViewModel.SongDetailUiState.Empty -> {
             // Handle empty state if needed
@@ -653,7 +653,7 @@ fun SongDetailsContent(
                     IconButton(onClick = {
                         val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND)
                         shareIntent.type = "text/plain"
-                        shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, "purrytify://song/${song.id}")
+                        shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, "https://puritify-deeplink.vercel.app/song/${song.id}")
                         context.startActivity(android.content.Intent.createChooser(shareIntent, null))
                     }) {
                         Icon(
