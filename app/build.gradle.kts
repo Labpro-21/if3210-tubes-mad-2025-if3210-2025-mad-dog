@@ -40,6 +40,7 @@ android {
     }
     buildFeatures {
         compose = true
+        viewBinding = true
     }
 }
 
@@ -120,4 +121,22 @@ dependencies {
     implementation("com.patrykandpatrick.vico:compose:1.13.1")
     implementation("com.patrykandpatrick.vico:compose-m3:1.13.1")
     implementation("com.patrykandpatrick.vico:core:1.13.1")
+
+    implementation("com.google.zxing:core:3.5.1")
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("androidx.core:core-ktx:1.12.0")
+
+    // Compose Foundation
+    implementation("androidx.compose.foundation:foundation:1.5.4")
+    
+    // Compose UI
+    implementation("androidx.compose.ui:ui:1.5.4")
+    implementation("androidx.compose.ui:ui-graphics:1.5.4")
+    
+    // Material3 (if using)
+    implementation("androidx.compose.material3:material3:1.1.2")
 }

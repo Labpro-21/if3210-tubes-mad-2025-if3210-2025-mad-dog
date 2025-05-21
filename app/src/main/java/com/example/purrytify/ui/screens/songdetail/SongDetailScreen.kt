@@ -68,6 +68,7 @@ import android.os.Build
 import androidx.core.content.ContextCompat
 import androidx.core.app.ActivityCompat
 import android.content.pm.PackageManager
+import com.example.purrytify.ui.qrcode.QrCodeActivity
 
 @Composable
 fun SongDetailScreen(
@@ -650,17 +651,32 @@ fun SongDetailsContent(
                 }
                 if (isOnline) {
                     val context = LocalContext.current
-                    IconButton(onClick = {
-                        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND)
-                        shareIntent.type = "text/plain"
-                        shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, "https://puritify-deeplink.vercel.app/song/${song.id}")
-                        context.startActivity(android.content.Intent.createChooser(shareIntent, null))
-                    }) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_share),
-                            contentDescription = "Share Song",
-                            tint = Color.White
-                        )
+                    Row {
+                        IconButton(onClick = {
+                            val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND)
+                            shareIntent.type = "text/plain"
+                            shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, "https://puritify-deeplink.vercel.app/song/${song.id}")
+                            context.startActivity(android.content.Intent.createChooser(shareIntent, null))
+                        }) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_share),
+                                contentDescription = "Share Song",
+                                tint = Color.White
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(onClick = {
+                            val qrCodeIntent = Intent(context, QrCodeActivity::class.java).apply {
+                                putExtra("DEEP_LINK", "https://puritify-deeplink.vercel.app/song/${song.id}")
+                            }
+                            context.startActivity(qrCodeIntent)
+                        }) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_qr_code),
+                                contentDescription = "Share QR Code",
+                                tint = Color.White
+                            )
+                        }
                     }
                 }
             }
