@@ -24,8 +24,19 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.isActive
 
 class ProfileViewModel(application: Application) : AndroidViewModel(application) {
+    companion object {
+        private const val TAG = "ProfileViewModel"
+        
+        // Refresh interval for Sound Capsule data when viewing profile screen (in milliseconds)
+        const val UI_REFRESH_INTERVAL = 30000 // 30 seconds
+    }
+    
     private val repository = ProfileRepository.getInstance(application)
     private val networkMonitor = NetworkMonitor
 
@@ -106,22 +117,64 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                     val year = currentDate.year
                     val month = currentDate.monthValue
                     
-                    // Generate or update the sound capsule data
-                    val soundCapsuleResult = soundCapsuleDao.generateAndSaveSoundCapsule(
-                        userId
-                    )
+                    // First, get the current data to display immediately
+                    val initialData = soundCapsuleDao.getSoundCapsuleWithDetails(userId)
+                    _soundCapsuleData.value = convertToViewModel(initialData)
                     
-                    // Convert to ViewModel format
-                    val soundCapsuleViewModel = convertToViewModel(soundCapsuleResult)
-                    _soundCapsuleData.value = soundCapsuleViewModel
+                    // Then, set up continuous observation of the Sound Capsule data
+                    // This will automatically update the UI when the database changes
+                    observeSoundCapsuleData(userId, year, month)
                     
-                    Log.d("SoundCapsuleData", "Result from DB: $soundCapsuleViewModel")
+                    Log.d("SoundCapsuleData", "Initial data loaded and continuous observation started")
                 } catch (e: Exception) {
                     Log.e("ProfileViewModel", "Error fetching sound capsule data: ${e.message}", e)
-                    // No fallback - just log the error
                 }
             } else {
                 Log.e("ProfileViewModel", "User ID is null, cannot fetch sound capsule data.")
+            }
+        }
+    }
+    
+    private fun observeSoundCapsuleData(userId: Int, year: Int, month: Int) {
+        // Cancel any existing job
+        periodicRefreshJob?.cancel()
+        
+        // Start Flow collection in a separate coroutine
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // Use the new Flow-based method for real-time updates
+                soundCapsuleDao.observeSoundCapsuleWithDetails(userId).collect { soundCapsuleData ->
+                    val viewModel = convertToViewModel(soundCapsuleData)
+                    _soundCapsuleData.value = viewModel
+                    Log.d("SoundCapsuleData", "Sound Capsule data updated: ${viewModel.totalTimeListened}ms listened")
+                }
+            } catch (e: Exception) {
+                Log.e("ProfileViewModel", "Error observing sound capsule data: ${e.message}", e)
+            }
+        }
+        
+        // Also set up a periodic refresh as a fallback
+        // This ensures data stays fresh even if the Flow observation fails to detect changes
+        periodicRefreshJob = viewModelScope.launch {
+            while (isActive) {
+                delay(30000) // Refresh using the defined interval
+                try {
+                    val latestData = withContext(Dispatchers.IO) {
+                        soundCapsuleDao.getSoundCapsuleWithDetails(userId)
+                    }
+                    val viewModel = convertToViewModel(latestData)
+                    
+                    // Only update if the data has actually changed
+                    val currentValue = _soundCapsuleData.value
+                    if (currentValue == null || 
+                        currentValue.totalTimeListened != viewModel.totalTimeListened ||
+                        currentValue.listeningDayStreak != viewModel.listeningDayStreak) {
+                        _soundCapsuleData.value = viewModel
+                        Log.d("SoundCapsuleData", "Periodic refresh updated data: ${viewModel.totalTimeListened}ms listened")
+                    }
+                } catch (e: Exception) {
+                    Log.e("ProfileViewModel", "Error in periodic refresh: ${e.message}", e)
+                }
             }
         }
     }
@@ -298,5 +351,13 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         object Success : UpdateProfileStatus()
         object NoInternet : UpdateProfileStatus()
         data class Error(val message: String) : UpdateProfileStatus()
+    }
+
+    // Add this at the class level
+    private var periodicRefreshJob: Job? = null
+
+    override fun onCleared() {
+        super.onCleared()
+        periodicRefreshJob?.cancel()
     }
 }

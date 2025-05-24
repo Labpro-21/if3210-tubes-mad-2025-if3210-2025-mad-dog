@@ -8,7 +8,6 @@ import androidx.room.Transaction
 import androidx.room.Update
 import com.example.purrytify.db.entity.ListeningActivity
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 @Dao
 interface ListeningActivityDao {
@@ -123,41 +122,7 @@ interface ListeningActivityDao {
         val playCount: Int
     )
 
-    @Query("""
-        WITH RECURSIVE dates(date) AS (
-            SELECT DATE('now', 'localtime')
-            UNION ALL
-            SELECT DATE(date, '-1 day')
-            FROM dates
-            WHERE date > DATE('now', 'localtime', '-30 days')
-        ),
-        daily_plays AS (
-            SELECT 
-                s.id as songId,
-                s.name,
-                s.artist,
-                s.artwork,
-                DATE(la.startTime / 1000, 'unixepoch', 'localtime') as playDate,
-                COUNT(*) as playCount
-            FROM listening_activity la
-            JOIN songs s ON la.songId = s.id
-            WHERE la.userId = :userId
-            AND la.completed = 1
-            AND DATE(la.startTime / 1000, 'unixepoch', 'localtime') >= DATE('now', 'localtime', '-30 days')
-            GROUP BY s.id, s.name, s.artist, s.artwork, playDate
-        )
-        SELECT 
-            daily_plays.songId as songId,
-            daily_plays.name as name,
-            daily_plays.artist as artist,
-            daily_plays.artwork as artwork,
-            dates.date as playDate,
-            COALESCE(daily_plays.playCount, 0) as playCount
-        FROM dates
-        LEFT JOIN daily_plays ON dates.date = daily_plays.playDate
-        ORDER BY dates.date DESC
-    """)
-    suspend fun getDayStreakSongs(userId: Int): List<DayStreakSong>
+
 
     // Update calculateDayStreak to handle nullable fields
     fun calculateDayStreak(streakSongs: List<DayStreakSong>): Int {

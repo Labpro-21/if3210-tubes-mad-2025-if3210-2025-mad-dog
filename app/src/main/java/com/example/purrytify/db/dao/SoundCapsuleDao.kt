@@ -9,6 +9,9 @@ import androidx.room.Update
 import com.example.purrytify.db.entity.DayStreakSong
 import com.example.purrytify.db.entity.SoundCapsule
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -38,6 +41,9 @@ interface SoundCapsuleDao {
     
     @Query("SELECT * FROM day_streak_songs WHERE capsuleId = :capsuleId ORDER BY date DESC")
     suspend fun getDayStreakSongsByCapsuleId(capsuleId: Int): List<DayStreakSong>
+
+    @Query("SELECT * FROM day_streak_songs WHERE capsuleId = :capsuleId ORDER BY date DESC")
+    fun observeDayStreakSongs(capsuleId: Int): Flow<List<DayStreakSong>>
     
     data class SoundCapsuleWithSongs(
         val userId: Int,
@@ -314,4 +320,183 @@ interface SoundCapsuleDao {
         AND s.lastUpdated < :cutoffTime
     """)
     suspend fun getOutdatedSoundCapsules(userId: Int, cutoffTime: Long): List<SoundCapsule>
+
+    @Transaction
+    suspend fun updateSoundCapsuleInRealTime(
+        userId: Int,
+        songId: Int,
+        duration: Long,
+        isComplete: Boolean
+    ) {
+        val currentDate = LocalDate.now()
+        val year = currentDate.year
+        val month = currentDate.monthValue
+        
+        // Get or create Sound Capsule for current month
+        var soundCapsule = getSoundCapsuleByMonth(userId, year, month)
+        
+        if (soundCapsule == null) {
+            // No Sound Capsule for this month, create a new one
+            // Use the full generation method to ensure all data is properly initialized
+            generateAndSaveSoundCapsule(userId, null)
+            soundCapsule = getSoundCapsuleByMonth(userId, year, month)
+            
+            // If still null after generation attempt, create a minimal one
+            if (soundCapsule == null) {
+                val newCapsule = SoundCapsule(
+                    userId = userId,
+                    year = year,
+                    month = month,
+                    totalTimeListened = duration,
+                    topArtistName = null,
+                    topArtistPlayCount = null,
+                    topSongId = null,
+                    listeningDayStreak = 0,
+                    lastUpdated = System.currentTimeMillis()
+                )
+                val capsuleId = insertSoundCapsule(newCapsule)
+                soundCapsule = getSoundCapsuleByMonth(userId, year, month)
+            }
+        } else if (duration > 0) {
+            // Only update the listening time if there's a positive duration to add
+            // This prevents double-counting when we're just updating completion status
+            val updatedCapsule = soundCapsule.copy(
+                totalTimeListened = soundCapsule.totalTimeListened + duration,
+                lastUpdated = System.currentTimeMillis()
+            )
+            updateSoundCapsule(updatedCapsule)
+        }
+        
+        // If song completed, update day streak songs for today
+        if (isComplete && soundCapsule != null) {
+            updateTodayStreakSong(soundCapsule.id, songId)
+        }
+        
+        // If this is a completed song, check if top song/artist needs updating
+        if (isComplete && soundCapsule != null) {
+            // This is more efficient than recalculating everything
+            updateTopSongAndArtistIfNeeded(userId, soundCapsule.id)
+        }
+    }
+
+    private suspend fun updateTodayStreakSong(capsuleId: Int, songId: Int) {
+        val today = LocalDate.now().toString()
+        
+        // Check if we have a streak song for today
+        val existingStreakSong = getDayStreakSongForDate(capsuleId, today)
+        
+        if (existingStreakSong != null) {
+            // Update existing streak song
+            val updatedStreakSong = existingStreakSong.copy(
+                songId = songId,
+                playCount = existingStreakSong.playCount + 1
+            )
+            updateDayStreakSong(updatedStreakSong)
+        } else {
+            // Create new streak song for today
+            val newStreakSong = DayStreakSong(
+                capsuleId = capsuleId,
+                songId = songId,
+                date = today,
+                playCount = 1
+            )
+            insertDayStreakSong(newStreakSong)
+        }
+        
+        // Update the listening day streak count
+        updateListeningDayStreak(capsuleId)
+    }
+
+    @Query("SELECT * FROM day_streak_songs WHERE capsuleId = :capsuleId AND date = :date LIMIT 1")
+    suspend fun getDayStreakSongForDate(capsuleId: Int, date: String): DayStreakSong?
+
+    @Update
+    suspend fun updateDayStreakSong(dayStreakSong: DayStreakSong)
+
+    private suspend fun updateListeningDayStreak(capsuleId: Int) {
+        val soundCapsule = getSoundCapsuleById(capsuleId) ?: return
+        val streakSongs = getDayStreakSongsByCapsuleId(capsuleId)
+        
+        // Convert to the format needed for streak calculation
+        val streakSongsData = streakSongs.map { streakSong ->
+            DayStreakSongData(
+                songId = streakSong.songId,
+                name = null,
+                artist = null,
+                artwork = null,
+                playDate = streakSong.date,
+                playCount = streakSong.playCount
+            )
+        }.sortedByDescending { it.playDate }
+        
+        val dayStreak = calculateDayStreak(streakSongsData)
+        
+        // Update the Sound Capsule with the new streak count
+        val updatedCapsule = soundCapsule.copy(
+            listeningDayStreak = dayStreak,
+            lastUpdated = System.currentTimeMillis()
+        )
+        updateSoundCapsule(updatedCapsule)
+    }
+
+    @Query("SELECT * FROM sound_capsules WHERE id = :id")
+    suspend fun getSoundCapsuleById(id: Int): SoundCapsule?
+
+    private suspend fun updateTopSongAndArtistIfNeeded(userId: Int, capsuleId: Int?) {
+        if (capsuleId == null) return
+        
+        val soundCapsule = getSoundCapsuleById(capsuleId) ?: return
+        
+        // Check if we need to update top song and artist
+        // Only do this occasionally to avoid excessive database operations
+        val lastUpdateThreshold = System.currentTimeMillis() - 3600000 // 1 hour
+        if (soundCapsule.lastUpdated > lastUpdateThreshold && 
+            soundCapsule.topSongId != null && 
+            soundCapsule.topArtistName != null) {
+            return
+        }
+        
+        // Get top song and artist
+        val topSong = getTopSongThisMonth(userId)
+        val topArtist = getTopArtistThisMonth(userId)
+        
+        // Update Sound Capsule with new top song and artist
+        val updatedCapsule = soundCapsule.copy(
+            topSongId = topSong?.id,
+            topArtistName = topArtist?.artist,
+            topArtistPlayCount = topArtist?.playCount,
+            lastUpdated = System.currentTimeMillis()
+        )
+        updateSoundCapsule(updatedCapsule)
+    }
+
+    fun observeSoundCapsuleWithDetails(userId: Int): Flow<SoundCapsuleWithSongs> = flow {
+        // Initial emission
+        val initialData = getSoundCapsuleWithDetails(userId)
+        emit(initialData)
+        
+        // Get the latest Sound Capsule
+        val latestCapsule = getLatestSoundCapsule(userId)
+        
+        if (latestCapsule != null) {
+            // Create a merged flow that triggers when either the Sound Capsule or day streak songs change
+            val capsuleFlow = getAllSoundCapsules(userId)
+            val streakSongsFlow = observeDayStreakSongs(latestCapsule.id)
+            
+            // Merge both flows to trigger updates when either changes
+            merge(capsuleFlow.map { "capsule" }, streakSongsFlow.map { "streak" }).collect {
+                // When either data source changes, get the full updated data
+                val updatedData = getSoundCapsuleWithDetails(userId)
+                emit(updatedData)
+            }
+        } else {
+            // If no Sound Capsule exists yet, just observe the Sound Capsule table
+            getAllSoundCapsules(userId).collect { capsules ->
+                if (capsules.isNotEmpty()) {
+                    val updatedData = getSoundCapsuleWithDetails(userId)
+                    emit(updatedData)
+                }
+            }
+        }
+    }
 } 
