@@ -68,6 +68,7 @@ import android.os.Build
 import androidx.core.content.ContextCompat
 import androidx.core.app.ActivityCompat
 import android.content.pm.PackageManager
+import com.example.purrytify.ui.qrcode.QrCodeActivity
 
 @Composable
 fun SongDetailScreen(
@@ -148,7 +149,26 @@ fun SongDetailScreen(
 
     when (uiState) {
         SongDetailViewModel.SongDetailUiState.Loading -> {
-            Text("Loading...", color = Color.White)
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        }
+        is SongDetailViewModel.SongDetailUiState.Error -> {
+            val errorMessage = (uiState as SongDetailViewModel.SongDetailUiState.Error).message
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(text = "Failed to load song", color = Color.White)
+                    Text(text = errorMessage, color = Color.Gray)
+                    Button(
+                        onClick = { 
+                            viewModel.loadSongDetails(songId, isOnline, region) 
+                        },
+                        modifier = Modifier.padding(top = 16.dp)
+                    ) {
+                        Text("Retry")
+                    }
+                }
+            }
         }
         is SongDetailViewModel.SongDetailUiState.Success -> {
             SongDetailsContent(
@@ -232,25 +252,6 @@ fun SongDetailScreen(
                     onRefresh = { audioOutputViewModel.scanDevices() }
                 )
             }
-        }
-        is SongDetailViewModel.SongDetailUiState.Error -> {
-            val errorMessage = (uiState as SongDetailViewModel.SongDetailUiState.Error).message
-            val context = LocalContext.current
-            AlertDialog(
-                onDismissRequest = {},
-                title = { Text("Failed to Load Song") },
-                text = { Text(errorMessage) },
-                confirmButton = {
-                    TextButton(onClick = { viewModel.loadSongDetails(songId, isOnline = isOnline, region = region, isDailyPlaylist = isDailyPlaylist) }) {
-                        Text("Retry")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { navController.popBackStack() }) {
-                        Text("Back")
-                    }
-                }
-            )
         }
         SongDetailViewModel.SongDetailUiState.Empty -> {
             // Handle empty state if needed
@@ -649,17 +650,36 @@ fun SongDetailsContent(
                 }
                 if (isOnline) {
                     val context = LocalContext.current
-                    IconButton(onClick = {
-                        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND)
-                        shareIntent.type = "text/plain"
-                        shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, "purrytify://song/${song.id}")
-                        context.startActivity(android.content.Intent.createChooser(shareIntent, null))
-                    }) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_share),
-                            contentDescription = "Share Song",
-                            tint = Color.White
-                        )
+                    Row {
+                        IconButton(onClick = {
+                            // Share link
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, "https://puritify-deeplink.vercel.app/song/${song.id}")
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, null))
+                        }) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_share),
+                                contentDescription = "Share Song",
+                                tint = Color.White
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(onClick = {
+                            // Share QR code
+                            val qrIntent = Intent(context, QrCodeActivity::class.java).apply {
+                                putExtra("DEEP_LINK", "https://puritify-deeplink.vercel.app/song/${song.id}")
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            context.startActivity(qrIntent)
+                        }) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_qr_code),
+                                contentDescription = "Share QR Code",
+                                tint = Color.White
+                            )
+                        }
                     }
                 }
             }

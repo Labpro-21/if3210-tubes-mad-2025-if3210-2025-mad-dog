@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">    <uses-permission android:name="android.permission.INTERNET" />
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.example.purrytify">
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -43,17 +45,31 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="purrytify" android:host="song" android:pathPattern="/\\d+" />
+                <data
+                    android:scheme="purrytify"
+                    android:host="song"
+                    android:pathPattern="/.*" />
             </intent-filter>
+
         </activity>
+        
+        <activity
+            android:name=".ui.qrcode.QrCodeActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Purrytify.Dialog" />
+        
+        <activity
+            android:name=".ui.qrcode.QrScannerActivity"
+            android:theme="@style/Theme.AppCompat.Light.DarkActionBar" />
         
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
+            android:authorities="${applicationId}.provider"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"                android:resource="@xml/file_paths" />
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
         </provider>
         
         <service

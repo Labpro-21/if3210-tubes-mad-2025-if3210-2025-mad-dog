@@ -1,6 +1,7 @@
 package com.example.purrytify.ui.navigation
 
 import android.app.Application
+import android.content.Context
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -63,6 +64,38 @@ fun AppNavigation(
     mainViewModel: MainViewModel
 ) {
     val navController = rememberNavController()
+    val context = LocalContext.current
+    
+    // Handle deep links after login
+    LaunchedEffect(Unit) {
+        val sharedPref = context.getSharedPreferences("DeepLinkPrefs", Context.MODE_PRIVATE)
+        val songId = sharedPref.getInt("deepLinkSongId", -1)
+        val isOnline = sharedPref.getBoolean("deepLinkIsOnline", false)
+        
+        if (songId != -1) {
+            // Clear the stored deep link
+            with(sharedPref.edit()) {
+                remove("deepLinkSongId")
+                remove("deepLinkIsOnline")
+                apply()
+            }
+            
+            // Navigate to song detail with proper online/offline state
+            val route = if (isOnline) {
+                Screen.SongDetailOnline.route
+                    .replace("{region}", "GLOBAL")
+                    .replace("{songId}", songId.toString())
+            } else {
+                Screen.SongDetail.route.replace("{songId}", songId.toString())
+            }
+            
+            navController.navigate(route) {
+                popUpTo(Screen.Home.route) { inclusive = false }
+                launchSingleTop = true
+            }
+        }
+    }
+    
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: Screen.Home.route
     val isMiniPlayerActive by mainViewModel.isMiniPlayerActive.collectAsState()
@@ -240,7 +273,12 @@ fun AppNavigation(
                 }
                 composable(
                     Screen.SongDetail.route,
-                    arguments = listOf(navArgument("songId") { type = NavType.IntType })
+                    arguments = listOf(navArgument("songId") { type = NavType.IntType }),
+                    deepLinks = listOf(
+                        navDeepLink {
+                            uriPattern = "purrytify://song/{songId}"
+                        }
+                    )
                 ) { backStackEntry ->
                     val songId = backStackEntry.arguments?.getInt("songId") ?: -1
                     SongDetailScreen(

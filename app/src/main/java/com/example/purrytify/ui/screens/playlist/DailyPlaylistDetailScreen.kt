@@ -75,7 +75,7 @@ fun DailyPlaylistDetailScreen(
                     IconButton(onClick = {
                         val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND)
                         shareIntent.type = "text/plain"
-                        shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, "purrytify://song/${song.id}")
+                        shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, "https://puritify-deeplink.vercel.app/song/${song.id}")
                         context.startActivity(android.content.Intent.createChooser(shareIntent, null))
                     }) {
                         Icon(

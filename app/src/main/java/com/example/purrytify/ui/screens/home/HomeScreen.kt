@@ -1,5 +1,6 @@
 package com.example.purrytify.ui.screens.home
 
+import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import androidx.annotation.DrawableRes
@@ -39,6 +40,7 @@ import com.example.purrytify.MainViewModel
 import com.example.purrytify.R
 import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.db.relationship.RecentlyPlayedWithSong
+import com.example.purrytify.ui.qrcode.QrScannerActivity
 
 @Composable
 fun HomeScreen(
@@ -92,131 +94,148 @@ fun HomeScreenContent(
     onNavigate: (String) -> Unit,
     isLandscape: Boolean
 ) {
-    val scrollState = rememberScrollState()
-
-    if (isLandscape) {
-        // Landscape layout with Row as the main container
-        Row(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(horizontal = 8.dp)
-        ) {
-            // Left column - Charts and Daily Mix
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .padding(end = 8.dp, top = 8.dp)
-            ) {
-                Text(
-                    text = "Charts",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                ChartSection(
-                    onNavigate = onNavigate, 
-                    isLandscape = true,
-                    userRegion = userRegion,
-                    supportedRegions = supportedRegions
-                )
-
-                if (dailyPlayList.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    DailyPlaylistCard(dailyPlayList) {
-                        onNavigate("album/GLOBAL?isDailyPlaylist=true")
+    val context = LocalContext.current
+    
+    Column(
+        modifier = modifier.fillMaxSize()
+    ) {
+        // Restored TopBar with QR Scanner
+        TopBar(
+            isLandscape = isLandscape,
+            onScanClick = {
+                context.startActivity(
+                    Intent(context, QrScannerActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
                     }
-                }
-            }
-
-            // Right column - New Songs and Recently Played
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .padding(start = 8.dp, top = 8.dp)
-            ) {
-                Text(
-                    text = "New Songs For You",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                NewSongsSectionLandscape(newAddedSongs, onNavigate)
-                
-                if (recentlyPlayedSongs.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(16.dp))
+            }
+        )
+
+        val scrollState = rememberScrollState()
+
+        if (isLandscape) {
+            // Landscape layout with Row as the main container
+            Row(
+                modifier = modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp)
+            ) {
+                // Left column - Charts and Daily Mix
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(end = 8.dp, top = 8.dp)
+                ) {
                     Text(
-                        text = "Recently Played",
-                        fontSize = 16.sp,
+                        text = "Charts",
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    RecentlyPlayedSectionLandscape(recentlyPlayedSongs, onNavigate)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ChartSection(
+                        onNavigate = onNavigate, 
+                        isLandscape = true,
+                        userRegion = userRegion,
+                        supportedRegions = supportedRegions
+                    )
+
+                    if (dailyPlayList.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        DailyPlaylistCard(dailyPlayList) {
+                            onNavigate("album/GLOBAL?isDailyPlaylist=true")
+                        }
+                    }
+                }
+
+                // Right column - New Songs and Recently Played
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(start = 8.dp, top = 8.dp)
+                ) {
+                    Text(
+                        text = "New Songs For You",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    NewSongsSectionLandscape(newAddedSongs, onNavigate)
+                    
+                    if (recentlyPlayedSongs.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Recently Played",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        RecentlyPlayedSectionLandscape(recentlyPlayedSongs, onNavigate)
+                    }
                 }
             }
-        }
-    } else {
-        // Portrait layout (original)
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp)
-                .verticalScroll(scrollState),
-        ) {
-            Spacer(modifier = Modifier.height(8.dp))
-            //TopBar(isLandscape = isLandscape)
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                text = "Charts",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            ChartSection(
-                onNavigate = onNavigate, 
-                isLandscape = false,
-                userRegion = userRegion,
-                supportedRegions = supportedRegions
-            )
-            Log.d("Daily","$dailyPlayList")
-
-            if (dailyPlayList.isNotEmpty()) {
+        } else {
+            // Portrait layout (original)
+            Column(
+                modifier = modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp)
+                    .verticalScroll(scrollState),
+            ) {
+                Spacer(modifier = Modifier.height(8.dp))
+                //TopBar(isLandscape = isLandscape)
                 Spacer(modifier = Modifier.height(24.dp))
-                DailyPlaylistCard(dailyPlayList) {
-                    onNavigate("album/GLOBAL?isDailyPlaylist=true")
-                }
-                Spacer(modifier = Modifier.height(24.dp))
-            }
 
-            Text(
-                text = "New Songs For You",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            RecommendedPlaylistsSection(newAddedSongs, onNavigate, isLandscape = false)
-
-            if (recentlyPlayedSongs.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(24.dp))
                 Text(
-                    text = "Recently Played",
+                    text = "Charts",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                // Modified section for scrolling fix
-                RecentlyPlayedSectionPortraitNonScrollable(recentlyPlayedSongs, onNavigate)
-            }
+                Spacer(modifier = Modifier.height(16.dp))
+                ChartSection(
+                    onNavigate = onNavigate, 
+                    isLandscape = false,
+                    userRegion = userRegion,
+                    supportedRegions = supportedRegions
+                )
+                Log.d("Daily","$dailyPlayList")
 
-            Spacer(modifier = Modifier.height(16.dp))
+                if (dailyPlayList.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    DailyPlaylistCard(dailyPlayList) {
+                        onNavigate("album/GLOBAL?isDailyPlaylist=true")
+                    }
+                }
+
+                Text(
+                    text = "New Songs For You",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                RecommendedPlaylistsSection(newAddedSongs, onNavigate, isLandscape = false)
+
+                if (recentlyPlayedSongs.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = "Recently Played",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    // Modified section for scrolling fix
+                    RecentlyPlayedSectionPortraitNonScrollable(recentlyPlayedSongs, onNavigate)
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
         }
     }
 }
@@ -306,9 +325,8 @@ fun DailyPlaylistCard(
     }
 }
 
-
 @Composable
-fun TopBar(isLandscape: Boolean = false) {
+fun TopBar(isLandscape: Boolean = false, onScanClick: () -> Unit = {}) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -316,12 +334,23 @@ fun TopBar(isLandscape: Boolean = false) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
+        IconButton(
+            onClick = onScanClick,
+            modifier = Modifier.size(48.dp)
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_camera),
+                contentDescription = "Scan QR Code",
+                tint = Color.White
+            )
+        }
         Text(
             text = "Purrytify",
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
             color = Color.White
         )
+        Spacer(modifier = Modifier.size(48.dp))
     }
 }
 

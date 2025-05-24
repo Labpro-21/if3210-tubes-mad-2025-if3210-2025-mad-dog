@@ -1,6 +1,7 @@
 package com.example.purrytify.ui.screens.songdetail
 
 import android.app.Application
+import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
@@ -506,6 +507,7 @@ class SongDetailViewModel(
         _isUpdateSuccessful.value = false
     }
 
+    // Add a factory that can pass MainViewModel to SongDetailViewModel
     class Factory(
         private val application: Application,
         private val mainViewModel: MainViewModel
