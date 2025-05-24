@@ -31,13 +31,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.purrytify.R
-import com.example.purrytify.db.dao.ListeningActivityDao
+import com.example.purrytify.ui.screens.profile.ProfileViewModel.SoundCapsuleViewModel
 import java.util.concurrent.TimeUnit
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.layout.ContentScale
 
 @Composable
 fun SoundCapsuleCard(
-    soundCapsule: ListeningActivityDao.SoundCapsule?,
+    soundCapsule: SoundCapsuleViewModel?,
     onTimeListenedClick: () -> Unit = {},
     onTopSongClick: () -> Unit = {},
     onTopArtistClick: () -> Unit = {},
@@ -46,11 +51,8 @@ fun SoundCapsuleCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.Transparent
-        )
+            .padding(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF282828))
     ) {
         Column(
             modifier = Modifier
@@ -158,6 +160,24 @@ fun SoundCapsuleCard(
                     )
                 }
 
+                // Streak Section
+                if (soundCapsule.streakSongs.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Listening Streak",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(soundCapsule.streakSongs.take(soundCapsule.listeningDayStreak)) { streakSong ->
+                            StreakSongCard(streakSong)
+                        }
+                    }
+                }
             } else {
                 Text(
                     text = "Data Sound Capsule belum tersedia.",
@@ -303,6 +323,72 @@ fun TopArtistSongCard(
                     modifier = Modifier
                         .size(50.dp)
                         .clip(CircleShape)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StreakSongCard(streakSong: SoundCapsuleViewModel.DayStreakSongViewModel) {
+    Card(
+        modifier = Modifier
+            .width(120.dp)
+            .height(160.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF383838))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Song Artwork
+            AsyncImage(
+                model = streakSong.artwork,
+                contentDescription = "Song artwork",
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                contentScale = ContentScale.Crop,
+                placeholder = painterResource(id = R.drawable.music_placeholder),
+                error = painterResource(id = R.drawable.music_placeholder)
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Song Name
+            Text(
+                text = streakSong.name ?: "No song played",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            
+            // Artist Name
+            Text(
+                text = streakSong.artist ?: "-",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            
+            // Play Date
+            Text(
+                text = streakSong.playDate,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (streakSong.playCount > 0) Color(0xFF4CAF50) else Color.Gray,
+                maxLines = 1
+            )
+            
+            if (streakSong.playCount > 0) {
+                Text(
+                    text = "${streakSong.playCount} plays",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFF4CAF50),
+                    maxLines = 1
                 )
             }
         }

@@ -14,6 +14,7 @@ import com.example.purrytify.data.model.ProfileResponse
 import com.example.purrytify.data.repository.ListeningActivityRepository
 import com.example.purrytify.db.AppDatabase
 import com.example.purrytify.db.dao.ListeningActivityDao
+import com.example.purrytify.db.dao.SoundCapsuleDao
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +22,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.Locale
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 class ProfileViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = ProfileRepository.getInstance(application)
@@ -55,100 +58,165 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private val _currentLocation = MutableStateFlow<String?>(null)
     val currentLocation: StateFlow<String?> = _currentLocation
 
-    private val _soundCapsuleData = MutableStateFlow<ListeningActivityDao.SoundCapsule?>(null)
-    val soundCapsuleData: StateFlow<ListeningActivityDao.SoundCapsule?> = _soundCapsuleData
+    private val _soundCapsuleData = MutableStateFlow<SoundCapsuleViewModel?>(null)
+    val soundCapsuleData: StateFlow<SoundCapsuleViewModel?> = _soundCapsuleData
 
     private val authRepository = AuthRepository.getInstance(application)
 
-    private val listenActivityDao = AppDatabase.getDatabase(application).listeningCapsuleDao()
+    private val appDatabase = AppDatabase.getDatabase(application)
+    private val listenActivityDao = appDatabase.listeningCapsuleDao()
+    private val soundCapsuleDao = appDatabase.soundCapsuleDao()
     private val listenActivityRepository = ListeningActivityRepository.getInstance(listenActivityDao)
+    
+    // Data class for UI representation of SoundCapsule
+    data class SoundCapsuleViewModel(
+        val totalTimeListened: Long,
+        val topArtist: String?,
+        val topSong: TopSongViewModel?,
+        val listeningDayStreak: Int,
+        val monthYear: String,
+        val streakSongs: List<DayStreakSongViewModel>
+    ) {
+        data class TopSongViewModel(
+            val id: Int,
+            val name: String,
+            val artist: String,
+            val description: String,
+            val duration: Long,
+            val artwork: String?
+        )
+        
+        data class DayStreakSongViewModel(
+            val songId: Int?,
+            val name: String?,
+            val artist: String?,
+            val artwork: String?,
+            val playDate: String,
+            val playCount: Int
+        )
+    }
+    
     fun getSoundCapsule() {
         viewModelScope.launch(Dispatchers.IO) {
             val userId = authRepository.currentUserId
             if (userId != null) {
                 try {
-                    val soundCapsuleResult = listenActivityRepository.getSoundCapsuleData(userId)
-                    _soundCapsuleData.value = soundCapsuleResult
-                    Log.d("SoundCapsuleData", "Result from DB: $soundCapsuleResult")
-                    Log.d(
-                        "SoundCapsuleData",
-                        "Total Listening Time: ${soundCapsuleResult.totalTimeListened}"
+                    // Get current date
+                    val currentDate = LocalDate.now()
+                    val year = currentDate.year
+                    val month = currentDate.monthValue
+                    
+                    // Generate or update the sound capsule data
+                    val soundCapsuleResult = soundCapsuleDao.generateAndSaveSoundCapsule(
+                        userId
                     )
-                    Log.d("SoundCapsuleData", "Top Artist: ${soundCapsuleResult.topArtist}")
-                    Log.d("SoundCapsuleData", "Top Song: ${soundCapsuleResult.topSong.toString()}")
-                    Log.d("SoundCapsuleData", "ListenedDayStreak: ${soundCapsuleResult.listeningDayStreak}")
-                    Log.d("SoundCapsuleData", "Month year: ${soundCapsuleResult.monthYear}")
-
+                    
+                    // Convert to ViewModel format
+                    val soundCapsuleViewModel = convertToViewModel(soundCapsuleResult)
+                    _soundCapsuleData.value = soundCapsuleViewModel
+                    
+                    Log.d("SoundCapsuleData", "Result from DB: $soundCapsuleViewModel")
                 } catch (e: Exception) {
                     Log.e("ProfileViewModel", "Error fetching sound capsule data: ${e.message}", e)
-                    _isError.value = true // Set error state jika gagal mengambil data dari DB
+                    // No fallback - just log the error
                 }
             } else {
                 Log.e("ProfileViewModel", "User ID is null, cannot fetch sound capsule data.")
-                _isError.value = true // Set error state jika User ID null
             }
         }
     }
+    
+    private fun convertToViewModel(source: SoundCapsuleDao.SoundCapsuleWithSongs): SoundCapsuleViewModel {
+        val capsule = source.soundCapsule
+        
+        val topSong = source.topSong?.let {
+            SoundCapsuleViewModel.TopSongViewModel(
+                id = it.id,
+                name = it.name,
+                artist = it.artist,
+                description = it.description,
+                duration = it.duration,
+                artwork = it.artwork
+            )
+        }
+        
+        val streakSongs = source.streakSongs.map {
+            SoundCapsuleViewModel.DayStreakSongViewModel(
+                songId = it.songId,
+                name = it.name,
+                artist = it.artist,
+                artwork = it.artwork,
+                playDate = it.playDate,
+                playCount = it.playCount
+            )
+        }
+        
+        val monthYear = if (capsule != null) {
+            val localDate = LocalDate.of(capsule.year, capsule.month, 1)
+            localDate.format(DateTimeFormatter.ofPattern("MMMM yyyy"))
+        } else {
+            LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM yyyy"))
+        }
+        
+        return SoundCapsuleViewModel(
+            totalTimeListened = capsule?.totalTimeListened ?: 0,
+            topArtist = capsule?.topArtistName,
+            topSong = topSong,
+            listeningDayStreak = capsule?.listeningDayStreak ?: 0,
+            monthYear = monthYear,
+            streakSongs = streakSongs
+        )
+    }
+    
     fun getProfile() {
-        viewModelScope.launch(Dispatchers.IO) { // Gunakan Dispatchers.IO untuk operasi database
+        viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
             _isError.value = false
             _noInternet.value = false
-            val userId = authRepository.currentUserId
-            if (userId != null) {
-                try {
-                    val soundCapsuleData = listenActivityRepository.getSoundCapsuleData(userId)
-                    Log.d("SoundCapsuleData", "Result from DB: $soundCapsuleData")
-                    Log.d(
-                        "SoundCapsuleData",
-                        "Total Listening Time: ${soundCapsuleData.totalTimeListened}"
-                    )
-                    Log.d("SoundCapsuleData", "Top Artist: ${soundCapsuleData.topArtist}")
-                    Log.d("SoundCapsuleData", "Top Song: ${soundCapsuleData.topSong.toString()}")
-                    Log.d("SoundCapsuleData", "ListenedDayStreak: ${soundCapsuleData.listeningDayStreak}")
-                    Log.d("SoundCapsuleData", "Month year: ${soundCapsuleData.monthYear}")
 
-                } catch (e: Exception) {
-                    Log.e("ProfileViewModel", "Error fetching sound capsule data: ${e.message}", e)
-                    _isError.value = true // Set error state jika gagal mengambil data dari DB
-                }
-            } else {
-                Log.e("ProfileViewModel", "User ID is null, cannot fetch sound capsule data.")
-                _isError.value = true // Set error state jika User ID null
-            }
-
-            // Tetap jalankan operasi jaringan di background thread juga
-            if (networkMonitor.isConnected.first()) {
-                val result = repository.getProfile()
-                if (result != null) {
-                    _profile.value = result
+            try {
+                // First check network connectivity
+                if (networkMonitor.isConnected.first()) {
+                    // Try to get profile from network
+                    val result = repository.getProfile()
+                    if (result != null) {
+                        _profile.value = result
+                        
+                        // After successful profile fetch, try to get sound capsule data
+                        getSoundCapsule()
+                    } else {
+                        _isError.value = true
+                    }
                 } else {
-                    _isError.value = true
+                    _noInternet.value = true
                 }
-            } else {
-                _noInternet.value = true
+            } catch (e: Exception) {
+                Log.e("ProfileViewModel", "Error in getProfile: ${e.message}", e)
+                _isError.value = true
+            } finally {
+                _isLoading.value = false
             }
-            _isLoading.value = false
         }
     }
 
     fun getSongsCount() {
-        viewModelScope.launch(Dispatchers.IO) { // Gunakan Dispatchers.IO untuk operasi database
+        viewModelScope.launch(Dispatchers.IO) {
             _songsCount.value = repository.getSongsCount()
         }
     }
 
     fun getFavoriteSongsCount() {
-        viewModelScope.launch(Dispatchers.IO) { // Gunakan Dispatchers.IO untuk operasi database
+        viewModelScope.launch(Dispatchers.IO) {
             _favoriteCount.value = repository.getSongsLiked()
         }
     }
 
     fun getTotalListenedCount() {
-        viewModelScope.launch(Dispatchers.IO) { // Gunakan Dispatchers.IO untuk operasi database
+        viewModelScope.launch(Dispatchers.IO) {
             _playedCount.value = repository.getTotalListened()
         }
     }
+    
     fun updateProfile(location: String, profilePhotoUri: Uri?) {
         viewModelScope.launch {
             _updateProfileStatus.value = UpdateProfileStatus.Loading
@@ -179,7 +247,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         try {
             fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
                 location?.let {
-                    viewModelScope.launch { // Operasi Geocoder mungkin perlu Dispatchers.IO
+                    viewModelScope.launch {
                         val countryCode = getCountryCodeFromLocation(context, it)
                         _currentLocation.value = countryCode
                     }
@@ -191,6 +259,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             onPermissionDenied()
         }
     }
+    
     private fun getCountryCodeFromLocation(context: Context, location: Location): String {
         try {
             val geocoder = Geocoder(context, Locale.getDefault())

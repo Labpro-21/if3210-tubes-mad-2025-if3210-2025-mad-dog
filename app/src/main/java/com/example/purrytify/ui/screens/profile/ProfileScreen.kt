@@ -383,7 +383,7 @@ private fun openAppSettings(context: Context) {
     context.startActivity(intent)
 }
 
-private fun handleCsvDownload(context: Context, soundCapsule: ListeningActivityDao.SoundCapsule?) {
+private fun handleCsvDownload(context: Context, soundCapsule: ProfileViewModel.SoundCapsuleViewModel?) {
     if (soundCapsule == null) {
         Toast.makeText(context, "No data available to download", Toast.LENGTH_SHORT).show()
         return
