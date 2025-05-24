@@ -28,7 +28,7 @@ import com.example.purrytify.utils.DateConverter
         SoundCapsule::class,
         DayStreakSong::class
     ],
-    version = 15
+    version = 16  // Updated version for ListeningActivity schema change
 )
 @TypeConverters(DateConverter::class)
 abstract class AppDatabase : RoomDatabase() {

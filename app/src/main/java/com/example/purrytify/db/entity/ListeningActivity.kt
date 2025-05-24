@@ -21,7 +21,7 @@ import java.util.Date
             entity = Songs::class,
             parentColumns = ["id"],
             childColumns = ["songId"],
-            onDelete = ForeignKey.CASCADE
+            onDelete = ForeignKey.SET_NULL
         )
     ],
     indices = [Index(value = ["userId"]), Index(value = ["songId"])]
@@ -30,7 +30,9 @@ data class ListeningActivity(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
     val userId: Int,
-    val songId: Int,
+    val songId: Int?,  // Make nullable to handle deleted songs
+    val songName: String?, // Store song name to preserve information if song is deleted
+    val songArtist: String?, // Store artist name to preserve information if song is deleted
     val startTime: Date,
     val endTime: Date?,  // Null jika masih didengarkan
     val duration: Long = 0, // Durasi dalam milidetik

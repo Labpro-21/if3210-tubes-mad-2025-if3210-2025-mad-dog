@@ -46,13 +46,15 @@ interface ListeningActivityDao {
     // Changed return type to TopArtist data class instead of String
     @Query(
         """
-        SELECT s.artist, COUNT(la.songId) AS playCount
+        SELECT 
+            COALESCE(s.artist, la.songArtist) as artist, 
+            COUNT(la.id) AS playCount
         FROM listening_activity la
-        JOIN songs s ON la.songId = s.id
+        LEFT JOIN songs s ON la.songId = s.id
         WHERE la.userId = :userId
         AND strftime('%Y-%m', la.startTime / 1000, 'unixepoch', 'localtime') = strftime('%Y-%m', 'now', 'localtime')
         AND la.completed = 1
-        GROUP BY s.artist
+        GROUP BY artist
         ORDER BY playCount DESC
         LIMIT 1
         """
@@ -62,13 +64,20 @@ interface ListeningActivityDao {
     // Modified to return more complete song information
     @Query(
         """
-        SELECT s.id, s.name, s.artist, s.description, s.duration, s.artwork, COUNT(la.songId) AS playCount
+        SELECT 
+            COALESCE(s.id, 0) as id, 
+            COALESCE(s.name, la.songName) as name, 
+            COALESCE(s.artist, la.songArtist) as artist, 
+            COALESCE(s.description, '') as description, 
+            COALESCE(s.duration, 0) as duration, 
+            s.artwork, 
+            COUNT(la.id) AS playCount
         FROM listening_activity la
-        JOIN songs s ON la.songId = s.id
+        LEFT JOIN songs s ON la.songId = s.id
         WHERE la.userId = :userId
         AND strftime('%Y-%m', la.startTime / 1000, 'unixepoch', 'localtime') = strftime('%Y-%m', 'now', 'localtime')
         AND la.completed = 1
-        GROUP BY s.id
+        GROUP BY name, artist
         ORDER BY playCount DESC
         LIMIT 1
         """
@@ -77,11 +86,15 @@ interface ListeningActivityDao {
 
     @Query(
         """
-        SELECT la.songId, DATE(la.startTime / 1000, 'unixepoch', 'localtime') AS playDate, COUNT(*) AS playCount
+        SELECT 
+            la.songId, 
+            DATE(la.startTime / 1000, 'unixepoch', 'localtime') AS playDate, 
+            COUNT(*) AS playCount
         FROM listening_activity la
         WHERE la.userId = :userId
         AND la.completed = 1
         AND DATE(la.startTime / 1000, 'unixepoch', 'localtime') >= DATE('now', 'localtime', '-2 days')
+        AND la.songId IS NOT NULL
         GROUP BY la.songId, playDate
         HAVING COUNT(*) >= 1
         ORDER BY playDate DESC
@@ -152,17 +165,15 @@ interface ListeningActivityDao {
 
     @Query("""
         SELECT 
-            DATE(startTime / 1000, 'unixepoch', 'localtime') as date,
-            ROUND(CAST(SUM(duration) AS FLOAT) / 60000.0, 2) as totalMinutes
-        FROM listening_activity
-        WHERE userId = :userId
-        
-        AND startTime >= strftime('%s000', 'now', '-30 days')
-        AND startTime <= strftime('%s000', 'now')
-        GROUP BY DATE(startTime / 1000, 'unixepoch', 'localtime')
+            DATE(la.startTime / 1000, 'unixepoch', 'localtime') as date,
+            ROUND(CAST(SUM(la.duration) AS FLOAT) / 60000.0, 2) as totalMinutes
+        FROM listening_activity la
+        WHERE la.userId = :userId
+        AND la.startTime >= strftime('%s000', 'now', '-30 days')
+        AND la.startTime <= strftime('%s000', 'now')
+        GROUP BY DATE(la.startTime / 1000, 'unixepoch', 'localtime')
         ORDER BY date ASC
     """)
-    //AND completed = 1
     suspend fun getDailyListeningStatsLastMonth(userId: Int): List<DailyListeningStats>
 
     // Data class for monthly played songs
@@ -175,13 +186,17 @@ interface ListeningActivityDao {
 
     @Query(
         """
-        SELECT s.name, s.artist, s.artwork, COUNT(la.songId) AS playCount
+        SELECT 
+            COALESCE(s.name, la.songName) as name, 
+            COALESCE(s.artist, la.songArtist) as artist, 
+            s.artwork, 
+            COUNT(la.id) AS playCount
         FROM listening_activity la
-        JOIN songs s ON la.songId = s.id
+        LEFT JOIN songs s ON la.songId = s.id
         WHERE la.userId = :userId
         AND strftime('%Y-%m', la.startTime / 1000, 'unixepoch', 'localtime') = strftime('%Y-%m', 'now', 'localtime')
         AND la.completed = 1
-        GROUP BY s.id, s.name, s.artist, s.artwork
+        GROUP BY name, artist, s.artwork
         ORDER BY playCount DESC
         """
     )
@@ -197,20 +212,15 @@ interface ListeningActivityDao {
     @Query(
         """
         SELECT 
-            s.artist,
+            COALESCE(s.artist, la.songArtist) as artist,
             COUNT(DISTINCT la.id) as playCount,
-            (
-                SELECT artwork 
-                FROM songs s2 
-                WHERE s2.artist = s.artist 
-                LIMIT 1
-            ) as artwork
+            MAX(s.artwork) as artwork
         FROM listening_activity la
-        JOIN songs s ON la.songId = s.id
+        LEFT JOIN songs s ON la.songId = s.id
         WHERE la.userId = :userId
         AND strftime('%Y-%m', la.startTime / 1000, 'unixepoch', 'localtime') = strftime('%Y-%m', 'now', 'localtime')
         AND la.completed = 1
-        GROUP BY s.artist
+        GROUP BY artist
         ORDER BY playCount DESC
         """
     )

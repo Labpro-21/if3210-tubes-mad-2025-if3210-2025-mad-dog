@@ -108,6 +108,9 @@ class MediaPlayerController private constructor(private val context: Context) {
     private var lastReportedPosition = 0
     private var totalReportedDuration = 0L
 
+    // Add this flag to track when we're seeking rather than playing naturally
+    private var isSeeking = false
+
     init {
         listenActivityDao = AppDatabase.getDatabase(context).listeningCapsuleDao()
         listenActivityRepository = ListeningActivityRepository.getInstance(listenActivityDao)
@@ -196,6 +199,8 @@ class MediaPlayerController private constructor(private val context: Context) {
                 val newActivity = ListeningActivity(
                     userId = userId,
                     songId = song.id,
+                    songName = song.name,
+                    songArtist = song.artist,
                     startTime = Date(),
                     endTime = null,
                     duration = 0L,
@@ -445,7 +450,7 @@ class MediaPlayerController private constructor(private val context: Context) {
                                     // Only update if there's unreported duration or we need to mark completion
                                     soundCapsuleDao.updateSoundCapsuleInRealTime(
                                         userId = userId,
-                                        songId = it.songId,
+                                        songId = it.songId!!,
                                         duration = unreportedDuration,
                                         isComplete = isComplete
                                     )
@@ -460,7 +465,7 @@ class MediaPlayerController private constructor(private val context: Context) {
                                     if (isComplete) {
                                         soundCapsuleDao.updateSoundCapsuleInRealTime(
                                             userId = userId,
-                                            songId = it.songId,
+                                            songId = it.songId!!,
                                             duration = 0,  // No additional duration
                                             isComplete = true
                                         )
@@ -504,8 +509,22 @@ class MediaPlayerController private constructor(private val context: Context) {
     }
 
     fun seekTo(position: Int) {
+        // Set the seeking flag to prevent updateCurrentPosition from counting this as playback
+        isSeeking = true
+        
+        // Store the current position before seeking
+        val previousPosition = mediaPlayer.currentPosition
+        lastReportedPosition = position
+        
+        // Perform the seek
         mediaPlayer.seekTo(position)
         _currentPosition.value = position
+        
+        // Reset the seeking flag after a short delay
+        serviceScope.launch {
+            kotlinx.coroutines.delay(100) // Short delay to ensure seek completes
+            isSeeking = false
+        }
     }
 
     fun getCurrentPosition(): Int {
@@ -649,51 +668,64 @@ class MediaPlayerController private constructor(private val context: Context) {
         updatePositionJob?.cancel()
         updatePositionJob = coroutineScope.launch {
             var lastRealTimeUpdate = System.currentTimeMillis()
-            lastReportedPosition = 0
+            lastReportedPosition = mediaPlayer.currentPosition
             totalReportedDuration = 0L
+            var lastProgressCheckTime = System.currentTimeMillis()
             
             while (mediaPlayer.isPlaying) {
+                val currentTime = System.currentTimeMillis()
                 val currentPosition = mediaPlayer.currentPosition
                 _currentPosition.value = currentPosition
                 
-                // Check if we should update the Sound Capsule in real-time
-                // Do this every 30 seconds (30000 ms) for more responsive real-time updates
-                val currentTime = System.currentTimeMillis()
-                if (!isOnlineSong.value && currentTime - lastRealTimeUpdate > REAL_TIME_UPDATE_INTERVAL) {
-                    val currentSong = _currentSong.value
-                    val positionDelta = currentPosition - lastReportedPosition
-                    
-                    if (currentSong != null && positionDelta > 0) {
-                        try {
-                            // Update Sound Capsule with elapsed time since last update
-                            authRepository.currentUserId?.let { userId ->
-                                serviceScope.launch {
-                                    try {
-                                        soundCapsuleDao.updateSoundCapsuleInRealTime(
-                                            userId = userId,
-                                            songId = currentSong.id,
-                                            duration = positionDelta.toLong(),
-                                            isComplete = false
-                                        )
-                                        
-                                        // Track the reported duration to avoid double-counting
-                                        totalReportedDuration += positionDelta.toLong()
-                                        
-                                        Log.d(TAG, "Updated Sound Capsule in real-time during playback. Delta: $positionDelta ms, Total reported: $totalReportedDuration ms")
-                                    } catch (e: Exception) {
-                                        Log.e(TAG, "Error updating Sound Capsule during playback: ${e.message}", e)
+                // Only update Sound Capsule if we're not seeking and actually playing
+                if (!isSeeking && mediaPlayer.isPlaying) {
+                    // Check if we should update the Sound Capsule in real-time
+                    // Do this every REAL_TIME_UPDATE_INTERVAL ms for responsive real-time updates
+                    if (!isOnlineSong.value && currentTime - lastRealTimeUpdate > REAL_TIME_UPDATE_INTERVAL) {
+                        val currentSong = _currentSong.value
+                        
+                        // Calculate actual playback progress since last update
+                        // This ensures we only count real playback time, not seek jumps
+                        val timeSinceLastCheck = currentTime - lastProgressCheckTime
+                        val expectedProgress = (timeSinceLastCheck * mediaPlayer.playbackParams.speed).toLong()
+                        val actualProgress = currentPosition - lastReportedPosition
+                        
+                        // Only update if we have a reasonable amount of progress
+                        // This filters out small fluctuations and seek operations
+                        if (currentSong != null && actualProgress > 0 && actualProgress < expectedProgress * 2) {
+                            try {
+                                // Update Sound Capsule with elapsed time since last update
+                                authRepository.currentUserId?.let { userId ->
+                                    serviceScope.launch {
+                                        try {
+                                            soundCapsuleDao.updateSoundCapsuleInRealTime(
+                                                userId = userId,
+                                                songId = currentSong.id,
+                                                duration = actualProgress.toLong(),
+                                                isComplete = false
+                                            )
+                                            
+                                            // Track the reported duration to avoid double-counting
+                                            totalReportedDuration += actualProgress.toLong()
+                                            
+                                            Log.d(TAG, "Updated Sound Capsule in real-time during playback. " +
+                                                  "Progress: $actualProgress ms, Total reported: $totalReportedDuration ms")
+                                        } catch (e: Exception) {
+                                            Log.e(TAG, "Error updating Sound Capsule during playback: ${e.message}", e)
+                                        }
                                     }
                                 }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error in real-time Sound Capsule update: ${e.message}")
                             }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error in real-time Sound Capsule update: ${e.message}")
+                            
+                            lastRealTimeUpdate = currentTime
+                            lastReportedPosition = currentPosition
                         }
-                        
-                        lastRealTimeUpdate = currentTime
-                        lastReportedPosition = currentPosition
                     }
                 }
                 
+                lastProgressCheckTime = currentTime
                 kotlinx.coroutines.delay(1000)
             }
         }

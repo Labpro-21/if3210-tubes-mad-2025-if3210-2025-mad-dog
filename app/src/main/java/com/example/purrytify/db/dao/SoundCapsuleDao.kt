@@ -181,18 +181,18 @@ interface SoundCapsuleDao {
         ),
         daily_plays AS (
             SELECT 
-                s.id as songId,
-                s.name,
-                s.artist,
-                s.artwork,
+                la.songId as songId,
+                COALESCE(s.name, la.songName) as name,
+                COALESCE(s.artist, la.songArtist) as artist,
+                s.artwork as artwork,
                 DATE(la.startTime / 1000, 'unixepoch', 'localtime') as playDate,
                 COUNT(*) as playCount
             FROM listening_activity la
-            JOIN songs s ON la.songId = s.id
+            LEFT JOIN songs s ON la.songId = s.id
             WHERE la.userId = :userId
             AND la.completed = 1
             AND DATE(la.startTime / 1000, 'unixepoch', 'localtime') >= DATE('now', 'localtime', '-30 days')
-            GROUP BY s.id, s.name, s.artist, s.artwork, playDate
+            GROUP BY songId, name, artist, artwork, playDate
         )
         SELECT 
             daily_plays.songId as songId,
@@ -372,10 +372,55 @@ interface SoundCapsuleDao {
             updateTodayStreakSong(soundCapsule.id, songId)
         }
         
-        // If this is a completed song, check if top song/artist needs updating
-        if (isComplete && soundCapsule != null) {
-            // This is more efficient than recalculating everything
-            updateTopSongAndArtistIfNeeded(userId, soundCapsule.id)
+        // Always refresh the top songs and artists data on completed songs,
+        // or periodically even for incomplete songs to keep the UI fresh
+        if (isComplete || shouldRefreshTopData(soundCapsule)) {
+            updateTopSongAndArtistData(userId, soundCapsule?.id)
+        }
+    }
+
+    /**
+     * Determines if we should refresh top songs/artists data
+     * This ensures the Sound Capsule UI stays current without excessive database operations
+     */
+    private fun shouldRefreshTopData(soundCapsule: SoundCapsule?): Boolean {
+        if (soundCapsule == null) return true
+        
+        // Refresh if:
+        // 1. We don't have top song/artist data
+        // 2. It's been more than 5 minutes since the last update
+        val noTopData = soundCapsule.topSongId == null || soundCapsule.topArtistName == null
+        val lastUpdateTime = soundCapsule.lastUpdated
+        val currentTime = System.currentTimeMillis()
+        val fiveMinutesMs = 5 * 60 * 1000
+        
+        return noTopData || (currentTime - lastUpdateTime > fiveMinutesMs)
+    }
+
+    /**
+     * Updates top song and artist data directly from listening activity data
+     */
+    private suspend fun updateTopSongAndArtistData(userId: Int, capsuleId: Int?) {
+        if (capsuleId == null) return
+        
+        val soundCapsule = getSoundCapsuleById(capsuleId) ?: return
+        
+        // Get current top song and artist from the database
+        val topSong = getTopSongThisMonth(userId)
+        val topArtist = getTopArtistThisMonth(userId)
+        
+        // Only update the database if the data has changed
+        if (soundCapsule.topSongId != topSong?.id || 
+            soundCapsule.topArtistName != topArtist?.artist ||
+            soundCapsule.topArtistPlayCount != topArtist?.playCount) {
+            
+            val updatedCapsule = soundCapsule.copy(
+                topSongId = topSong?.id,
+                topArtistName = topArtist?.artist,
+                topArtistPlayCount = topArtist?.playCount,
+                lastUpdated = System.currentTimeMillis()
+            )
+            updateSoundCapsule(updatedCapsule)
         }
     }
 
@@ -441,34 +486,6 @@ interface SoundCapsuleDao {
 
     @Query("SELECT * FROM sound_capsules WHERE id = :id")
     suspend fun getSoundCapsuleById(id: Int): SoundCapsule?
-
-    private suspend fun updateTopSongAndArtistIfNeeded(userId: Int, capsuleId: Int?) {
-        if (capsuleId == null) return
-        
-        val soundCapsule = getSoundCapsuleById(capsuleId) ?: return
-        
-        // Check if we need to update top song and artist
-        // Only do this occasionally to avoid excessive database operations
-        val lastUpdateThreshold = System.currentTimeMillis() - 3600000 // 1 hour
-        if (soundCapsule.lastUpdated > lastUpdateThreshold && 
-            soundCapsule.topSongId != null && 
-            soundCapsule.topArtistName != null) {
-            return
-        }
-        
-        // Get top song and artist
-        val topSong = getTopSongThisMonth(userId)
-        val topArtist = getTopArtistThisMonth(userId)
-        
-        // Update Sound Capsule with new top song and artist
-        val updatedCapsule = soundCapsule.copy(
-            topSongId = topSong?.id,
-            topArtistName = topArtist?.artist,
-            topArtistPlayCount = topArtist?.playCount,
-            lastUpdated = System.currentTimeMillis()
-        )
-        updateSoundCapsule(updatedCapsule)
-    }
 
     fun observeSoundCapsuleWithDetails(userId: Int): Flow<SoundCapsuleWithSongs> = flow {
         // Initial emission
