@@ -8,7 +8,6 @@ import androidx.room.Transaction
 import androidx.room.Update
 import com.example.purrytify.db.entity.ListeningActivity
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 @Dao
 interface ListeningActivityDao {
@@ -114,59 +113,36 @@ interface ListeningActivityDao {
         val playCount: Int
     )
 
-    // Fungsi untuk menghitung day-streak (membutuhkan pemrosesan lebih lanjut di luar kueri)
-    fun calculateDayStreak(userId: Int): Int {
-        val recentPlays = getRecentListeningActivity(userId)
-        if (recentPlays.isEmpty()) {
-            return 0
-        }
+    data class DayStreakSong(
+        val songId: Int?,
+        val name: String?,
+        val artist: String?,
+        val artwork: String?,
+        val playDate: String,
+        val playCount: Int
+    )
 
-        val playedDates = recentPlays.groupBy { it.songId }.mapValues { entry ->
-            entry.value.map { it.playDate }.toSet()
-        }
 
-        var maxStreak = 0
-        for ((_, dates) in playedDates) {
-            var currentStreak = 0
-            var currentDate = java.time.LocalDate.now()
-            while (dates.contains(currentDate.toString())) {
+
+    // Update calculateDayStreak to handle nullable fields
+    fun calculateDayStreak(streakSongs: List<DayStreakSong>): Int {
+        if (streakSongs.isEmpty()) return 0
+
+        var currentStreak = 0
+        var currentDate = LocalDate.now()
+
+        for (song in streakSongs) {
+            val songDate = LocalDate.parse(song.playDate)
+            if (songDate == currentDate && song.playCount > 0) {
                 currentStreak++
                 currentDate = currentDate.minusDays(1)
-            }
-            if (currentStreak > maxStreak) {
-                maxStreak = currentStreak
+            } else if (song.playCount == 0) {
+                break
             }
         }
-        return maxStreak
+
+        return currentStreak
     }
-
-    // Updated function to get all Sound Capsule data with complete song information and month-year
-    @Transaction
-    fun getSoundCapsuleData(userId: Int): SoundCapsule {
-        val totalTime = getTotalListeningTimeThisMonth(userId)
-        val topArtistResult = getTopArtistThisMonth(userId)
-        val topSongResult = getTopSongThisMonth(userId)
-        val dayStreak = calculateDayStreak(userId)
-
-        val currentMonthYear = LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM yyyy"))
-
-        return SoundCapsule(
-            totalTimeListened = totalTime,
-            topArtist = topArtistResult?.artist,
-            topSong = topSongResult, // Now passing the entire TopSongComplete object
-            listeningDayStreak = dayStreak,
-            monthYear = currentMonthYear // Added month and year information
-        )
-    }
-
-    // Updated data class for Sound Capsule with complete song information and month-year
-    data class SoundCapsule(
-        val totalTimeListened: Long,
-        val topArtist: String?,
-        val topSong: TopSongComplete?, // Changed from String? to TopSongComplete?
-        val listeningDayStreak: Int,
-        val monthYear: String // Added property for month and year
-    )
 
     // Data class to hold daily listening statistics
     data class DailyListeningStats(

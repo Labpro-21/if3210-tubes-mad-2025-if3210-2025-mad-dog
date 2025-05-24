@@ -24,9 +24,11 @@ interface UsersDao {
     @Query("SELECT * FROM users WHERE id = :userId")
     suspend fun getUserById(userId: Int): Users?
 
+    @Query("SELECT * FROM users WHERE id = :userId")
+    fun observeUserById(userId: Int): Flow<Users?>
+
     @Query("SELECT totalplayed FROM users WHERE id =:userId")
     suspend fun getTotalPlayedById(userId: Int?): Int?
-
 
     @Query("SELECT * FROM users")
     fun getAllUsers(): Flow<List<Users>>

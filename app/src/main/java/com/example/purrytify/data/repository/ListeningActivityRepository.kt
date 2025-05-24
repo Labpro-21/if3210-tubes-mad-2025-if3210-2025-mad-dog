@@ -59,14 +59,6 @@ class ListeningActivityRepository private constructor(
         return listeningActivityDao.getRecentListeningActivity(userId)
     }
 
-    suspend fun calculateDayStreak(userId: Int): Int {
-        return listeningActivityDao.calculateDayStreak(userId)
-    }
-
-    suspend fun getSoundCapsuleData(userId: Int): ListeningActivityDao.SoundCapsule {
-        return listeningActivityDao.getSoundCapsuleData(userId)
-    }
-
     suspend fun getDailyListeningData(userId: Int): List<ListeningActivityDao.DailyListeningStats>{
         return listeningActivityDao.getDailyListeningStatsLastMonth(userId)
     }
