@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -62,6 +63,10 @@ fun HomeScreen(
         }
     }
 
+    // Get the device configuration to determine orientation
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
     Scaffold { paddingValues ->
         HomeScreenContent(
             modifier = Modifier.padding(paddingValues),
@@ -70,7 +75,8 @@ fun HomeScreen(
             dailyPlayList = dailyPlayList,
             userRegion = userRegion,
             supportedRegions = homeViewModel.supportedRegions,
-            onNavigate = { route -> navController.navigate(route) }
+            onNavigate = { route -> navController.navigate(route) },
+            isLandscape = isLandscape
         )
     }
 }
@@ -83,39 +89,65 @@ fun HomeScreenContent(
     dailyPlayList: List<Songs>,
     userRegion: String?,
     supportedRegions: Map<String, String>,
-    onNavigate: (String) -> Unit
+    onNavigate: (String) -> Unit,
+    isLandscape: Boolean
 ) {
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val scrollState = rememberScrollState()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = if (isLandscape) 8.dp else 16.dp)
-            .verticalScroll(scrollState),
-    ) {
-        Spacer(modifier = Modifier.height(if (isLandscape) 0.dp else 8.dp))
-        //TopBar(isLandscape = isLandscape)
-        Spacer(modifier = Modifier.height(if (isLandscape) 12.dp else 24.dp))
-
-        if (isLandscape) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+    if (isLandscape) {
+        // Landscape layout with Row as the main container
+        Row(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(horizontal = 8.dp)
+        ) {
+            // Left column - Charts and Daily Mix
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(end = 8.dp, top = 8.dp)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "New Songs For You",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    NewSongsSectionLandscape(newAddedSongs, onNavigate)
+                Text(
+                    text = "Charts",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                ChartSection(
+                    onNavigate = onNavigate, 
+                    isLandscape = true,
+                    userRegion = userRegion,
+                    supportedRegions = supportedRegions
+                )
+
+                if (dailyPlayList.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    DailyPlaylistCard(dailyPlayList) {
+                        onNavigate("album/GLOBAL?isDailyPlaylist=true")
+                    }
                 }
-                Spacer(modifier = Modifier.width(16.dp))
-                Column(modifier = Modifier.weight(1f)) {
+            }
+
+            // Right column - New Songs and Recently Played
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 8.dp, top = 8.dp)
+            ) {
+                Text(
+                    text = "New Songs For You",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                NewSongsSectionLandscape(newAddedSongs, onNavigate)
+                
+                if (recentlyPlayedSongs.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = "Recently Played",
                         fontSize = 16.sp,
@@ -126,7 +158,19 @@ fun HomeScreenContent(
                     RecentlyPlayedSectionLandscape(recentlyPlayedSongs, onNavigate)
                 }
             }
-        } else {
+        }
+    } else {
+        // Portrait layout (original)
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp)
+                .verticalScroll(scrollState),
+        ) {
+            Spacer(modifier = Modifier.height(8.dp))
+            //TopBar(isLandscape = isLandscape)
+            Spacer(modifier = Modifier.height(24.dp))
+
             Text(
                 text = "Charts",
                 fontSize = 20.sp,
@@ -171,9 +215,9 @@ fun HomeScreenContent(
                 // Modified section for scrolling fix
                 RecentlyPlayedSectionPortraitNonScrollable(recentlyPlayedSongs, onNavigate)
             }
-        }
 
-        Spacer(modifier = Modifier.height(if (isLandscape) 8.dp else 16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+        }
     }
 }
 
@@ -212,11 +256,13 @@ fun DailyPlaylistCard(
     val firstSong = dailyPlaylist.first()
     val artworkUri = firstSong.artwork?.let { Uri.parse(it) }
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(120.dp)
+            .height(if (isLandscape) 80.dp else 120.dp)
             .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF232323))
@@ -228,19 +274,33 @@ fun DailyPlaylistCard(
                 ),
                 contentDescription = "Daily Playlist Artwork",
                 modifier = Modifier
-                    .size(100.dp)
-                    .padding(12.dp)
-                    .clip(RoundedCornerShape(12.dp)),
+                    .size(if (isLandscape) 60.dp else 100.dp)
+                    .padding(if (isLandscape) 8.dp else 12.dp)
+                    .clip(RoundedCornerShape(if (isLandscape) 8.dp else 12.dp)),
                 contentScale = ContentScale.Crop
             )
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                Text("Daily Playlist", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 22.sp)
-                Text("${dailyPlaylist.size} songs", color = Color.Gray, fontSize = 14.sp)
+                Text(
+                    "Daily Playlist", 
+                    fontWeight = FontWeight.Bold, 
+                    color = Color.White, 
+                    fontSize = if (isLandscape) 16.sp else 22.sp
+                )
+                Text(
+                    "${dailyPlaylist.size} songs", 
+                    color = Color.Gray, 
+                    fontSize = if (isLandscape) 12.sp else 14.sp
+                )
             }
             IconButton(onClick = onClick) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(36.dp))
+                Icon(
+                    Icons.Filled.PlayArrow, 
+                    contentDescription = "Play", 
+                    tint = Color.White, 
+                    modifier = Modifier.size(if (isLandscape) 24.dp else 36.dp)
+                )
             }
         }
     }
@@ -267,18 +327,20 @@ fun TopBar(isLandscape: Boolean = false) {
 
 @Composable
 fun NewSongsSectionLandscape(newAddedSongs: List<Songs>, onNavigate: (String) -> Unit) {
-    LazyColumn {
-        items(newAddedSongs) { song ->
+    Column {
+        for (song in newAddedSongs) {
             SongItemLandscape(song, onNavigate, isRecommended = true)
+            Spacer(modifier = Modifier.height(4.dp))
         }
     }
 }
 
 @Composable
 fun RecentlyPlayedSectionLandscape(recentlyPlayedSongs: List<RecentlyPlayedWithSong>, onNavigate: (String) -> Unit) {
-    LazyColumn {
-        items(recentlyPlayedSongs) { recentlyPlayedWithSong ->
+    Column {
+        for (recentlyPlayedWithSong in recentlyPlayedSongs) {
             SongItemLandscape(recentlyPlayedWithSong.song, onNavigate)
+            Spacer(modifier = Modifier.height(4.dp))
         }
     }
 }
@@ -345,13 +407,13 @@ fun ChartSection(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(150.dp),
+                .height(if (isLandscape) 100.dp else 150.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = "No charts available for your region",
                 color = Color.Gray,
-                fontSize = 16.sp,
+                fontSize = if (isLandscape) 14.sp else 16.sp,
                 textAlign = TextAlign.Center
             )
         }
@@ -383,7 +445,7 @@ fun SongItemLandscape(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(vertical = 2.dp)
             .clickable { onNavigate("songDetails/${song.id}") },
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -395,14 +457,27 @@ fun SongItemLandscape(
             ),
             contentDescription = if (isRecommended) "New Song Artwork" else "Recently Played Artwork",
             modifier = Modifier
-                .size(56.dp)
+                .size(40.dp)
                 .clip(RoundedCornerShape(4.dp)),
             contentScale = ContentScale.Crop
         )
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(6.dp))
         Column {
-            Text(text = song.name, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 16.sp, maxLines = 1)
-            Text(text = song.artist, fontSize = 12.sp, color = Color.Gray, maxLines = 1)
+            Text(
+                text = song.name, 
+                fontWeight = FontWeight.Bold, 
+                color = Color.White, 
+                fontSize = 14.sp, 
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = song.artist, 
+                fontSize = 12.sp, 
+                color = Color.Gray, 
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
@@ -417,14 +492,14 @@ fun AlbumItemRecommendedPortrait(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .width(if (isLandscape) 50.dp else 110.dp)
+            .width(if (isLandscape) 80.dp else 110.dp)
             .clickable { onNavigate() }
     ) {
         Image(
             painter = painterResource(id = artworkResId),
             contentDescription = region,
             modifier = Modifier
-                .size(if (isLandscape) 50.dp else 110.dp)
+                .size(if (isLandscape) 80.dp else 110.dp)
                 .clip(RoundedCornerShape(8.dp)),
             contentScale = ContentScale.Crop
         )
@@ -434,14 +509,18 @@ fun AlbumItemRecommendedPortrait(
             color = Color.White,
             fontSize = if (isLandscape) 12.sp else 14.sp,
             fontWeight = FontWeight.Medium,
-            maxLines = 1
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
         )
         Text(
             text = artist,
             color = Color.Gray,
             fontSize = if (isLandscape) 10.sp else 12.sp,
             fontWeight = FontWeight.Medium,
-            maxLines = 1
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
         )
     }
 }
@@ -458,7 +537,7 @@ fun SongItemRecommendedPortrait(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .width(if (isLandscape) 50.dp else 110.dp)
+            .width(if (isLandscape) 80.dp else 110.dp)
             .clickable { onNavigate("songDetails/${song.id}") }
     ) {
         Image(
@@ -469,7 +548,7 @@ fun SongItemRecommendedPortrait(
             ),
             contentDescription = song.name,
             modifier = Modifier
-                .size(if (isLandscape) 50.dp else 110.dp)
+                .size(if (isLandscape) 80.dp else 110.dp)
                 .clip(RoundedCornerShape(4.dp)),
             contentScale = ContentScale.Crop
         )
@@ -479,14 +558,20 @@ fun SongItemRecommendedPortrait(
             color = Color.White,
             fontSize = if (isLandscape) 12.sp else 14.sp,
             fontWeight = FontWeight.Medium,
-            maxLines = 1
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
         )
         Text(
             text = song.artist,
             color = Color.Gray,
             fontSize = if (isLandscape) 10.sp else 12.sp,
             fontWeight = FontWeight.Medium,
-            maxLines = 1
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
         )
     }
 }
