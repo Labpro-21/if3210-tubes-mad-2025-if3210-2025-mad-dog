@@ -13,6 +13,7 @@ import com.example.purrytify.db.AppDatabase
 import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.db.relationship.RecentlyPlayedWithSong
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
@@ -40,6 +41,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         recommendationRepository,
         authRepository
     )
+
+    private val _userRegion = MutableStateFlow<String?>(null)
+    val userRegion: StateFlow<String?> = _userRegion
     
     val dailyPlaylist: StateFlow<List<Songs>> = dailyPlaylistRepository.dailyPlaylist
 
@@ -71,6 +75,28 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             Log.w(Tag, "User ID is null. Recently played songs will be empty.")
         }
         Log.d(Tag, "User ID: $userId, Recently played songs: $recentlyPlayedSongs")
+        
+        // Start observing user region changes
+        observeUserRegion()
+    }
+
+    private fun observeUserRegion() {
+        viewModelScope.launch {
+            try {
+                val userId = authRepository.currentUserId ?: return@launch
+                // Observe user data changes
+                usersDao.observeUserById(userId).collect { user ->
+                    user?.let {
+                        if (_userRegion.value != it.region) {
+                            Log.d(Tag, "User region changed from ${_userRegion.value} to ${it.region}")
+                            _userRegion.value = it.region
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(Tag, "Error observing user region: ${e.message}")
+            }
+        }
     }
 
     fun loadDailyPlaylist() {
@@ -79,4 +105,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             dailyPlaylistRepository.getDailyPlaylist()
         }
     }
+
+    // List of supported regions with their display names
+    val supportedRegions = mapOf(
+        "GLOBAL" to "Global",
+        "ID" to "Indonesia",
+        "US" to "United States",
+        "USA" to "United States",
+        "UK" to "United Kingdom",
+        "MY" to "Malaysia",
+        "BR" to "Brazil",
+        "DE" to "Germany",
+        "CH" to "Switzerland",
+    )
+
 }

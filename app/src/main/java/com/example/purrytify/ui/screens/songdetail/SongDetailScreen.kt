@@ -93,7 +93,6 @@ fun SongDetailScreen(
     val isUpdateSuccessful by viewModel.isUpdateSuccessful.collectAsState()
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    viewModel.setOnline(isOnline)
 
     val audioOutputViewModel: AudioOutputViewModel = viewModel()
     val devices by audioOutputViewModel.devices.collectAsState()

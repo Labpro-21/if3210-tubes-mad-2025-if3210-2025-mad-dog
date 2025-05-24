@@ -2,6 +2,7 @@ package com.example.purrytify.ui.screens.album
 
 import AlbumViewModel
 import android.app.Application
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,12 +26,14 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
@@ -86,10 +89,16 @@ fun AlbumScreen(
     val errorMessage by albumViewModel.errorMessage.collectAsState()
     val downloadProgress by albumViewModel.downloadProgress.collectAsState()
     val context = LocalContext.current
+    val TAG = "AlbumScreen"
+    
+    // Check if we're in landscape mode
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     
     // Cache song sequences in MainViewModel whenever songs list changes
     LaunchedEffect(songs) {
         if (songs.isNotEmpty()) {
+            Log.d(TAG,"cacheOnlineSongSequence region: $region, $songs")
             mainViewModel.cacheOnlineSongSequence(region, songs)
         }
     }
@@ -97,7 +106,7 @@ fun AlbumScreen(
     // Determine the correct image and title based on type
     val (imageName, title, description) = if (isDailyPlaylist) {
         Triple(
-            "daily_${region.lowercase(Locale.ROOT)}", 
+            "daily_mix",
             "Daily Mix - ${region.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }}", 
             "Your daily personalized playlist based on your listening habits in ${region.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }}."
         )
@@ -119,192 +128,484 @@ fun AlbumScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(dominantColor)
-            .padding(horizontal = 16.dp)
-    ) {
-        // Album Cover
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 32.dp, bottom = 16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(200.dp)
-                    .shadow(
-                        elevation = 16.dp,
-                        shape = RoundedCornerShape(8.dp),
-                        spotColor = Color.Black.copy(alpha = 0.5f),
-                        ambientColor = Color.Black.copy(alpha = 0.5f)
-                    )
-                    .clip(RoundedCornerShape(8.dp))
-            ) {
-                Image(
-                    painter = painterResource(id = artworkResource),
-                    contentDescription = title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            }
-        }
-
-        // Title and Description
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp)
-        )
-        Text(
-            text = description,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 8.dp)
-        )
-
-        // Total duration
+    if (isLandscape) {
+        // Landscape layout
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxSize()
+                .background(dominantColor)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            Icon(
-                painter = painterResource(id = R.drawable.music_placeholder), // Replace with actual clock icon
-                contentDescription = "Duration",
-                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = "Total: ${calculateTotalDuration(songs)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-            )
-        }
-
-        // Download and Play Buttons
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = { 
-                    albumViewModel.downloadSongs(
-                        region = region, 
-                        userId = albumViewModel.getCurrentUserid(),
-                        isDailyPlaylist = isDailyPlaylist
-                    ) 
-                },
-                modifier = Modifier
-                    .size(36.dp)
-                    .padding(start = 12.dp),
-                enabled = !isLoading && downloadProgress == null // Disable button when loading or downloading
-            ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.download),
-                    contentDescription = "Download",
-                    tint = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.size(36.dp)
-                )
-            }
-
-            // Play button
-            Button(
-                onClick = { /* Handle play action */ },
-                modifier = Modifier
-                    .size(32.dp),
-                shape = CircleShape,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF1DB954) // Spotify green
-                ),
-                contentPadding = PaddingValues(0.dp),
-                enabled = songs.isNotEmpty() && downloadProgress == null // Enable only when songs are loaded and not downloading
-            ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.play), // Replace with actual play icon
-                    contentDescription = "Play",
-                    tint = Color.Black,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-        }
-
-        // Download Progress Indicator
-        if (downloadProgress != null) {
-            val (downloaded, total) = downloadProgress!!
+            // Left side - Album info
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
+                    .weight(0.4f)
+                    .padding(end = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                LinearProgressIndicator(
-                    progress = if (total > 0) downloaded.toFloat() / total.toFloat() else 0f,
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(4.dp))
+                // Album Cover
+                Box(
+                    modifier = Modifier
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(150.dp)
+                            .shadow(
+                                elevation = 8.dp,
+                                shape = RoundedCornerShape(8.dp),
+                                spotColor = Color.Black.copy(alpha = 0.5f),
+                                ambientColor = Color.Black.copy(alpha = 0.5f)
+                            )
+                            .clip(RoundedCornerShape(8.dp))
+                    ) {
+                        Image(
+                            painter = painterResource(id = artworkResource),
+                            contentDescription = title,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                }
+
+                // Title and Description
                 Text(
-                    text = "Mengunduh $downloaded dari $total lagu",
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 4.dp)
+                )
+                Text(
+                    text = description,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
                 )
+
+                // Total duration
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.music_placeholder),
+                        contentDescription = "Duration",
+                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Total: ${calculateTotalDuration(songs)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                    )
+                }
+
+                // Download and Play Buttons
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = { 
+                            albumViewModel.downloadSongs(
+                                region = region, 
+                                userId = albumViewModel.getCurrentUserid(),
+                                isDailyPlaylist = isDailyPlaylist
+                            ) 
+                        },
+                        modifier = Modifier
+                            .size(32.dp)
+                            .padding(start = 8.dp),
+                        enabled = !isLoading && downloadProgress == null
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.download),
+                            contentDescription = "Download",
+                            tint = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    // Play button
+                    Button(
+                        onClick = { /* Handle play action */ },
+                        modifier = Modifier
+                            .size(28.dp),
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF1DB954) // Spotify green
+                        ),
+                        contentPadding = PaddingValues(0.dp),
+                        enabled = songs.isNotEmpty() && downloadProgress == null
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.play),
+                            contentDescription = "Play",
+                            tint = Color.Black,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+
+                // Download Progress Indicator
+                if (downloadProgress != null) {
+                    val (downloaded, total) = downloadProgress!!
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        LinearProgressIndicator(
+                            progress = if (total > 0) downloaded.toFloat() / total.toFloat() else 0f,
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Mengunduh $downloaded dari $total lagu",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                            fontSize = 12.sp
+                        )
+                    }
+                }
             }
-        } else if (isLoading) {
-            // Loading Indicator for initial song fetch
+
+            // Right side - Song list
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .weight(0.6f)
+                    .fillMaxHeight()
+            ) {
+                if (isLoading) {
+                    // Loading Indicator for initial song fetch
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    }
+                } else if (errorMessage != null) {
+                    // Error message
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = errorMessage!!,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                } else {
+                    // Song List
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        contentPadding = PaddingValues(bottom = 8.dp)
+                    ) {
+                        itemsIndexed(songs) { _, song ->
+                            SongItemRowLandscape(
+                                song = song, 
+                                navController = navController, 
+                                region = region,
+                                isDailyPlaylist = isDailyPlaylist
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        // Portrait layout (original)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(dominantColor)
+                .padding(horizontal = 16.dp)
+        ) {
+            // Album Cover
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 32.dp, bottom = 16.dp),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-            }
-        } else if (errorMessage != null) {
-            // Error message
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = errorMessage!!,
-                    color = MaterialTheme.colorScheme.error,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        } else {
-            // Song List
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(bottom = 16.dp)
-            ) {
-                itemsIndexed(songs) { _, song ->
-                    SongItemRow(
-                        song = song, 
-                        navController = navController, 
-                        region = region,
-                        isDailyPlaylist = isDailyPlaylist
+                Box(
+                    modifier = Modifier
+                        .size(200.dp)
+                        .shadow(
+                            elevation = 16.dp,
+                            shape = RoundedCornerShape(8.dp),
+                            spotColor = Color.Black.copy(alpha = 0.5f),
+                            ambientColor = Color.Black.copy(alpha = 0.5f)
+                        )
+                        .clip(RoundedCornerShape(8.dp))
+                ) {
+                    Image(
+                        painter = painterResource(id = artworkResource),
+                        contentDescription = title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
                     )
                 }
             }
+
+            // Title and Description
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+            )
+
+            // Total duration
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.music_placeholder),
+                    contentDescription = "Duration",
+                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Total: ${calculateTotalDuration(songs)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                )
+            }
+
+            // Download and Play Buttons
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { 
+                        albumViewModel.downloadSongs(
+                            region = region, 
+                            userId = albumViewModel.getCurrentUserid(),
+                            isDailyPlaylist = isDailyPlaylist
+                        ) 
+                    },
+                    modifier = Modifier
+                        .size(36.dp)
+                        .padding(start = 12.dp),
+                    enabled = !isLoading && downloadProgress == null // Disable button when loading or downloading
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.download),
+                        contentDescription = "Download",
+                        tint = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+
+                // Play button
+                Button(
+                    onClick = { /* Handle play action */ },
+                    modifier = Modifier
+                        .size(32.dp),
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF1DB954) // Spotify green
+                    ),
+                    contentPadding = PaddingValues(0.dp),
+                    enabled = songs.isNotEmpty() && downloadProgress == null // Enable only when songs are loaded and not downloading
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.play), // Replace with actual play icon
+                        contentDescription = "Play",
+                        tint = Color.Black,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            // Download Progress Indicator
+            if (downloadProgress != null) {
+                val (downloaded, total) = downloadProgress!!
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    LinearProgressIndicator(
+                        progress = if (total > 0) downloaded.toFloat() / total.toFloat() else 0f,
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Mengunduh $downloaded dari $total lagu",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            } else if (isLoading) {
+                // Loading Indicator for initial song fetch
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                }
+            } else if (errorMessage != null) {
+                // Error message
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = errorMessage!!,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            } else {
+                // Song List
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = 16.dp)
+                ) {
+                    itemsIndexed(songs) { _, song ->
+                        SongItemRow(
+                            song = song, 
+                            navController = navController, 
+                            region = region,
+                            isDailyPlaylist = isDailyPlaylist
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SongItemRowLandscape(
+    song: OnlineSongResponse, 
+    navController: NavController, 
+    region: String,
+    isDailyPlaylist: Boolean = false
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(4.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0f))
+            .clickable {
+                val route = if (isDailyPlaylist) {
+                    Screen.SongDetailOnline.route
+                        .replace("{region}", region)
+                        .replace("{songId}", song.id.toString()) + 
+                        (if (isDailyPlaylist) "?isDailyPlaylist=true" else "")
+                } else {
+                    Screen.SongDetailOnline.route
+                        .replace("{region}", region)
+                        .replace("{songId}", song.id.toString())
+                }
+                navController.navigate(route)
+            }
+            .padding(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (!isDailyPlaylist) {
+            Text(
+                text = song.rank.toString(),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .width(20.dp),
+                fontSize = 12.sp
+            )
+        } else {
+            Spacer(modifier = Modifier.width(2.dp))
+        }
+        
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(song.artwork)
+                .crossfade(true)
+                .build(),
+            contentDescription = song.title,
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(2.dp)),
+            contentScale = ContentScale.Crop,
+            placeholder = painterResource(id = R.drawable.music_placeholder),
+            error = painterResource(id = R.drawable.music_placeholder)
+        )
+        Column(
+            modifier = Modifier
+                .padding(start = 8.dp)
+                .weight(1f)
+        ) {
+            Text(
+                text = song.title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontSize = 14.sp
+            )
+            Text(
+                text = song.artist,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontSize = 12.sp
+            )
         }
     }
 }
