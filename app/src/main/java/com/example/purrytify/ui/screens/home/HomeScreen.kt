@@ -1,5 +1,6 @@
 package com.example.purrytify.ui.screens.home
 
+import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import androidx.annotation.DrawableRes
@@ -38,6 +39,7 @@ import com.example.purrytify.MainViewModel
 import com.example.purrytify.R
 import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.db.relationship.RecentlyPlayedWithSong
+import com.example.purrytify.ui.qrcode.QrScannerActivity
 
 @Composable
 fun HomeScreen(
@@ -79,18 +81,25 @@ fun HomeScreenContent(
     dailyPlayList: List<Songs>,
     onNavigate: (String) -> Unit
 ) {
+    val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = if (isLandscape) 8.dp else 16.dp)
-            .verticalScroll(scrollState), // Add vertical scrolling
     ) {
         Spacer(modifier = Modifier.height(if (isLandscape) 0.dp else 8.dp))
-        //TopBar(isLandscape = isLandscape)
+        TopBar(
+            isLandscape = isLandscape,
+            onScanClick = {
+                val intent = Intent(context, QrScannerActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(intent)
+            }
+        )
         Spacer(modifier = Modifier.height(if (isLandscape) 12.dp else 24.dp))
 
         if (isLandscape) {
@@ -121,60 +130,58 @@ fun HomeScreenContent(
                 }
             }
         } else {
-            Text(
-                text = "Charts",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            ChartSection(onNavigate, isLandscape = false)
-            Log.d("Daily","$dailyPlayList")
-
-            if (dailyPlayList.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(24.dp))
-                DailyPlaylistCard(dailyPlayList) {
-                    onNavigate("album/GLOBAL?isDailyPlaylist=true")
+            LazyColumn(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                item {
+                    Text(
+                        text = "Charts",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    ChartSection(onNavigate, isLandscape = false)
                 }
-                Spacer(modifier = Modifier.height(24.dp))
+
+                if (dailyPlayList.isNotEmpty()) {
+                    item {
+                        Spacer(modifier = Modifier.height(24.dp))
+                        DailyPlaylistCard(dailyPlayList) {
+                            onNavigate("album/GLOBAL?isDailyPlaylist=true")
+                        }
+                        Spacer(modifier = Modifier.height(24.dp))
+                    }
+                }
+
+                item {
+                    Text(
+                        text = "New Songs For You",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    RecommendedPlaylistsSection(newAddedSongs, onNavigate, isLandscape = false)
+                }
+
+                if (recentlyPlayedSongs.isNotEmpty()) {
+                    item {
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Text(
+                            text = "Recently Played",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                    items(recentlyPlayedSongs) { recentlyPlayedWithSong ->
+                        SongItemPortrait(recentlyPlayedWithSong.song, onNavigate)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
             }
-
-            Text(
-                text = "New Songs For You",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            RecommendedPlaylistsSection(newAddedSongs, onNavigate, isLandscape = false)
-
-            if (recentlyPlayedSongs.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(24.dp))
-                Text(
-                    text = "Recently Played",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                // Modified section for scrolling fix
-                RecentlyPlayedSectionPortraitNonScrollable(recentlyPlayedSongs, onNavigate)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(if (isLandscape) 8.dp else 16.dp))
-    }
-}
-
-// Modified to use Column instead of LazyColumn for better parent scrolling experience
-@Composable
-fun RecentlyPlayedSectionPortraitNonScrollable(recentlyPlayedSongs: List<RecentlyPlayedWithSong>, onNavigate: (String) -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        recentlyPlayedSongs.forEach { recentlyPlayedWithSong ->
-            SongItemPortrait(recentlyPlayedWithSong.song, onNavigate)
-            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
@@ -237,7 +244,9 @@ fun DailyPlaylistCard(
 
 
 @Composable
-fun TopBar(isLandscape: Boolean = false) {
+fun TopBar(isLandscape: Boolean = false, onScanClick: () -> Unit = {}) {
+    val context = LocalContext.current
+    
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -245,12 +254,28 @@ fun TopBar(isLandscape: Boolean = false) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
+        IconButton(
+            onClick = {
+                val intent = Intent(context, QrScannerActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(intent)
+            },
+            modifier = Modifier.size(48.dp)
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_camera),
+                contentDescription = "Scan QR Code",
+                tint = Color.White
+            )
+        }
         Text(
             text = "Purrytify",
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
             color = Color.White
         )
+        Spacer(modifier = Modifier.size(48.dp)) // To balance the layout
     }
 }
 

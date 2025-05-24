@@ -653,10 +653,12 @@ fun SongDetailsContent(
                     val context = LocalContext.current
                     Row {
                         IconButton(onClick = {
-                            val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND)
-                            shareIntent.type = "text/plain"
-                            shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, "https://puritify-deeplink.vercel.app/song/${song.id}")
-                            context.startActivity(android.content.Intent.createChooser(shareIntent, null))
+                            // Share link
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, "https://puritify-deeplink.vercel.app/song/${song.id}")
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, null))
                         }) {
                             Icon(
                                 painter = painterResource(id = R.drawable.ic_share),
@@ -666,10 +668,12 @@ fun SongDetailsContent(
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         IconButton(onClick = {
-                            val qrCodeIntent = Intent(context, QrCodeActivity::class.java).apply {
+                            // Share QR code
+                            val qrIntent = Intent(context, QrCodeActivity::class.java).apply {
                                 putExtra("DEEP_LINK", "https://puritify-deeplink.vercel.app/song/${song.id}")
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
                             }
-                            context.startActivity(qrCodeIntent)
+                            context.startActivity(qrIntent)
                         }) {
                             Icon(
                                 painter = painterResource(id = R.drawable.ic_qr_code),

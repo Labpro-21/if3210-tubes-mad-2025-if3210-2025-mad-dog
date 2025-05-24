@@ -139,4 +139,7 @@ dependencies {
     
     // Material3 (if using)
     implementation("androidx.compose.material3:material3:1.1.2")
+
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation("androidx.activity:activity-compose:1.7.0")
 }

@@ -231,10 +231,11 @@ fun MiniPlayer(mainViewModel: MainViewModel, onMiniPlayerClick: () -> Unit, modi
                     Row {
                         IconButton(
                             onClick = {
-                                val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND)
-                                shareIntent.type = "text/plain"
-                                shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, "https://puritify-deeplink.vercel.app/song/${song.id}")
-                                context.startActivity(android.content.Intent.createChooser(shareIntent, null))
+                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, "https://puritify-deeplink.vercel.app/song/${song.id}")
+                                }
+                                context.startActivity(Intent.createChooser(shareIntent, null))
                             }
                         ) {
                             Icon(
@@ -246,10 +247,11 @@ fun MiniPlayer(mainViewModel: MainViewModel, onMiniPlayerClick: () -> Unit, modi
                         Spacer(modifier = Modifier.width(8.dp))
                         IconButton(
                             onClick = {
-                                val qrCodeIntent = Intent(context, QrCodeActivity::class.java).apply {
+                                val qrIntent = Intent(context, QrCodeActivity::class.java).apply {
                                     putExtra("DEEP_LINK", "https://puritify-deeplink.vercel.app/song/${song.id}")
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
                                 }
-                                context.startActivity(qrCodeIntent)
+                                context.startActivity(qrIntent)
                             }
                         ) {
                             Icon(
