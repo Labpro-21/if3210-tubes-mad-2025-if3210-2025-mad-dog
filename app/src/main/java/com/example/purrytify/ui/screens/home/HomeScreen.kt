@@ -13,7 +13,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -28,6 +27,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -49,10 +49,12 @@ fun HomeScreen(
     val recentlyPlayedSongs = homeViewModel.recentlyPlayedSongs.collectAsState(initial = emptyList()).value
     val newAddedSongs = homeViewModel.newAddedSongs.collectAsState(initial = emptyList()).value
     val dailyPlayList = homeViewModel.dailyPlaylist.collectAsState(initial = emptyList()).value
+    val userRegion = homeViewModel.userRegion.collectAsState().value
+    
+    Log.d("HomeScreen", "User region: $userRegion")
     Log.d("Init home played songs: ", "$recentlyPlayedSongs")
     Log.d("Init home new songs: ", "$newAddedSongs")
     Log.d("USER ID INIT: ", "${homeViewModel.userId}")
-
 
     LaunchedEffect(dailyPlayList.isEmpty()) {
         if (dailyPlayList.isEmpty()) {
@@ -65,7 +67,9 @@ fun HomeScreen(
             modifier = Modifier.padding(paddingValues),
             recentlyPlayedSongs = recentlyPlayedSongs,
             newAddedSongs = newAddedSongs,
-            dailyPlayList= dailyPlayList,
+            dailyPlayList = dailyPlayList,
+            userRegion = userRegion,
+            supportedRegions = homeViewModel.supportedRegions,
             onNavigate = { route -> navController.navigate(route) }
         )
     }
@@ -77,6 +81,8 @@ fun HomeScreenContent(
     recentlyPlayedSongs: List<RecentlyPlayedWithSong>,
     newAddedSongs: List<Songs>,
     dailyPlayList: List<Songs>,
+    userRegion: String?,
+    supportedRegions: Map<String, String>,
     onNavigate: (String) -> Unit
 ) {
     val configuration = LocalConfiguration.current
@@ -87,7 +93,7 @@ fun HomeScreenContent(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = if (isLandscape) 8.dp else 16.dp)
-            .verticalScroll(scrollState), // Add vertical scrolling
+            .verticalScroll(scrollState),
     ) {
         Spacer(modifier = Modifier.height(if (isLandscape) 0.dp else 8.dp))
         //TopBar(isLandscape = isLandscape)
@@ -128,7 +134,12 @@ fun HomeScreenContent(
                 color = Color.White
             )
             Spacer(modifier = Modifier.height(16.dp))
-            ChartSection(onNavigate, isLandscape = false)
+            ChartSection(
+                onNavigate = onNavigate, 
+                isLandscape = false,
+                userRegion = userRegion,
+                supportedRegions = supportedRegions
+            )
             Log.d("Daily","$dailyPlayList")
 
             if (dailyPlayList.isNotEmpty()) {
@@ -296,30 +307,67 @@ fun RecommendedPlaylistsSection(newAddedSongs: List<Songs>, onNavigate: (String)
     }
 }
 @Composable
-fun ChartSection(onNavigate: (String) -> Unit, isLandscape: Boolean){
-    val albums = listOf(
-        Triple("GLOBAL", "Global", R.drawable.top50global),
-        Triple("ID", "Indonesia", R.drawable.top50id),
-        Triple("MY", "Malaysia", R.drawable.top50my),
-        Triple("US", "United States", R.drawable.top50usa),
-        Triple("GB", "United Kingdom", R.drawable.top50uk),
-        Triple("CH", "Switzerland", R.drawable.top50ch),
-        Triple("DE", "Germany", R.drawable.top50de),
-        Triple("BR", "Brazil", R.drawable.top50br),
+fun ChartSection(
+    onNavigate: (String) -> Unit, 
+    isLandscape: Boolean,
+    userRegion: String?,
+    supportedRegions: Map<String, String>
+) {
+    // Always show GLOBAL and user's region if it's supported
+    val albumsToShow = mutableListOf<Triple<String, String, Int>>()
+    
+    // Always add GLOBAL
+    albumsToShow.add(Triple("GLOBAL", "Global", R.drawable.top50global))
+    
+    // Add user's region if it's supported
+    if (!userRegion.isNullOrEmpty()) {
+        val regionDisplayName = supportedRegions[userRegion]
+        val regionDrawableId = when (userRegion) {
+            "ID" -> R.drawable.top50id
+            "US" -> R.drawable.top50us
+            "MY" -> R.drawable.top50my
+            "UK" -> R.drawable.top50uk
+            "USA" -> R.drawable.top50us
+            "BR" -> R.drawable.top50br
+            "DE" -> R.drawable.top50de
+            "CH" -> R.drawable.top50ch
 
-        )
+            else -> null
+        }
+        
+        if (regionDisplayName != null && regionDrawableId != null && userRegion != "GLOBAL") {
+            albumsToShow.add(Triple(userRegion, regionDisplayName, regionDrawableId))
+        }
+    }
 
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 8.dp else 16.dp)
-    ) {
-        items(albums) { (region, artist, resId) ->
-            AlbumItemRecommendedPortrait(
-                region = region,
-                artist = artist,
-                artworkResId = resId,
-                onNavigate = { onNavigate("album/${region}") },
-                isLandscape = isLandscape
+    if (albumsToShow.isEmpty()) {
+        // Show error message if no albums available
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(150.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "No charts available for your region",
+                color = Color.Gray,
+                fontSize = 16.sp,
+                textAlign = TextAlign.Center
             )
+        }
+    } else {
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 8.dp else 16.dp)
+        ) {
+            items(albumsToShow) { (region, displayName, resId) ->
+                AlbumItemRecommendedPortrait(
+                    region = region,
+                    artist = displayName,
+                    artworkResId = resId,
+                    onNavigate = { onNavigate("album/${region}") },
+                    isLandscape = isLandscape
+                )
+            }
         }
     }
 }
