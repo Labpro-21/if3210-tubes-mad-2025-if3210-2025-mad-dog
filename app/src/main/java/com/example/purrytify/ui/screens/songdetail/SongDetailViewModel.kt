@@ -70,6 +70,7 @@ class SongDetailViewModel(
 
     private fun getCurrentOnlineSong(): OnlineSongResponse? {
         val currentId = _currentOnlineSongId.value
+        Log.d(tag,"current online song id from _currentOnlineSongId.value: $currentId")
         return if (currentId != null) {
             _onlineSongs.value.find { it.id == currentId }
         } else {
@@ -300,6 +301,7 @@ class SongDetailViewModel(
             if (isOnline) {
                 // Try to get cached song sequence from injected MainViewModel
                 val cachedSongs = mainViewModel?.getOnlineSongSequence(currentRegion)
+                Log.d(tag,"Cached Song: $cachedSongs")
                 
                 if (!cachedSongs.isNullOrEmpty()) {
                     // Use cached sequence if available
@@ -320,6 +322,7 @@ class SongDetailViewModel(
                 
                 // Fall back to original implementation if cache not available
                 if (_onlineSongs.value.isEmpty()) {
+                    Log.d(TAG,"Fallback, cache not avail buat region: $currentRegion")
                     val loaded = loadOnlineSongsSync(currentRegion) // Try to reload
                     if (!loaded) {
                         // Handle error: could not load songs
@@ -547,8 +550,26 @@ class SongDetailViewModel(
         viewModelScope.launch {
             _songDetails.value = SongDetailUiState.Loading
             try {
-                val onlineSong = onlineSongRepository.getSongById(songId)
+                // First load the global songs to ensure we have the full list
+                val loadedSuccessfully = loadOnlineSongsSync("GLOBAL")
+                if (!loadedSuccessfully) {
+                    _songDetails.value = SongDetailUiState.Error("Failed to load online songs")
+                    return@launch
+                }
+
+                // Try to find the song in the loaded songs first
+                var onlineSong = _onlineSongs.value.find { it.id == songId }
+                
+                // If not found in loaded songs, try direct API call
+                if (onlineSong == null) {
+                    onlineSong = onlineSongRepository.getSongById(songId)
+                }
+
                 if (onlineSong != null) {
+                    // Set current online song ID and region
+                    setCurrentOnlineSongId(songId)
+                    setCurrentOnlineRegion("GLOBAL")
+
                     val song = Songs(
                         id = onlineSong.id,
                         name = onlineSong.title,
@@ -562,6 +583,7 @@ class SongDetailViewModel(
                         uploadDate = Date()
                     )
                     _songDetails.value = SongDetailUiState.Success(song)
+                    checkIfAlreadyDownloaded(songId)
                 } else {
                     _songDetails.value = SongDetailUiState.Error("Failed to fetch song from server")
                 }

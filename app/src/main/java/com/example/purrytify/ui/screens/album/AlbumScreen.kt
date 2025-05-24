@@ -2,6 +2,7 @@ package com.example.purrytify.ui.screens.album
 
 import AlbumViewModel
 import android.app.Application
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -86,10 +87,12 @@ fun AlbumScreen(
     val errorMessage by albumViewModel.errorMessage.collectAsState()
     val downloadProgress by albumViewModel.downloadProgress.collectAsState()
     val context = LocalContext.current
+    val TAG = "AlbumScreen"
     
     // Cache song sequences in MainViewModel whenever songs list changes
     LaunchedEffect(songs) {
         if (songs.isNotEmpty()) {
+            Log.d(TAG,"cacheOnlineSongSequence region: $region, $songs")
             mainViewModel.cacheOnlineSongSequence(region, songs)
         }
     }
