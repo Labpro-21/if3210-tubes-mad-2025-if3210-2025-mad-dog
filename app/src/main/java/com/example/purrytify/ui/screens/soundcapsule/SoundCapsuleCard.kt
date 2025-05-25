@@ -123,7 +123,7 @@ fun SoundCapsuleCard(
                     TopArtistSongCard(
                         title = "Top artist",
                         name = soundCapsule.topArtist ?: "-",
-                        artworkUrl = null,
+                        artworkUrl = findArtistArtwork(soundCapsule),
                         modifier = Modifier
                             .weight(1f)
                             .clickable { onTopArtistClick() },
@@ -246,6 +246,28 @@ fun SoundCapsuleCard(
             }
         }
     }
+}
+
+// Function to find an artwork URL for the top artist by looking at their songs
+private fun findArtistArtwork(soundCapsule: SoundCapsuleViewModel?): String? {
+    if (soundCapsule == null || soundCapsule.topArtist.isNullOrEmpty()) return null
+    
+    // First, check if the top song is by the top artist
+    if (soundCapsule.topSong?.artist == soundCapsule.topArtist) {
+        return soundCapsule.topSong.artwork
+    }
+    
+    // Next, check if the top streak song is by the top artist
+    if (soundCapsule.topStreakSong?.artist == soundCapsule.topArtist) {
+        return soundCapsule.topStreakSong.artwork
+    }
+    
+    // Finally, look through all streak songs to find one by the top artist
+    val artistSong = soundCapsule.streakSongs.find { 
+        it.artist == soundCapsule.topArtist && !it.artwork.isNullOrEmpty()
+    }
+    
+    return artistSong?.artwork
 }
 
 @Composable
