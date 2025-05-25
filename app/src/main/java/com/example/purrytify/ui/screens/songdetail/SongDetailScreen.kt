@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -55,6 +56,7 @@ import coil.request.ImageRequest
 import com.example.purrytify.MainViewModel
 import com.example.purrytify.R
 import com.example.purrytify.data.model.AudioOutputDevice
+import com.example.purrytify.data.model.AudioOutputDeviceType
 import com.example.purrytify.ui.screens.songdetail.AudioOutputViewModel
 import com.example.purrytify.db.entity.Songs
 import com.example.purrytify.ui.navigation.Screen
@@ -68,6 +70,7 @@ import android.os.Build
 import androidx.core.content.ContextCompat
 import androidx.core.app.ActivityCompat
 import android.content.pm.PackageManager
+import androidx.compose.ui.text.style.TextOverflow
 import com.example.purrytify.ui.qrcode.QrCodeActivity
 
 @Composable
@@ -622,29 +625,69 @@ fun SongDetailsContent(
             }
 
             Spacer(modifier = Modifier.height(if (isLandscape) 16.dp else 32.dp))
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
+                // Enhanced Audio Output Device Selector
+                Card(
                     modifier = Modifier
                         .clickable { onShowDeviceDialog() }
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .weight(1f)
+                        .padding(end = if (isOnline) 8.dp else 0.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.Black.copy(alpha = 0.3f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Dynamic icon based on device type
+                        val (iconRes, iconColor) = when {
+                            selectedDevice?.type == AudioOutputDeviceType.BLUETOOTH -> {
+                                Pair(R.drawable.ic_bluetooth, Color(0xFF2196F3))
+                            }
+                            selectedDevice?.type == AudioOutputDeviceType.WIRELESS_HEADSET -> {
+                                Pair(R.drawable.ic_headphones, Color(0xFF4CAF50))
+                            }
+                            else -> {
+                                Pair(R.drawable.ic_baseline_speaker_24, Color(0xFFFF9800))
+                            }
+                        }
+                        
                         Icon(
-                            painter = painterResource(id = R.drawable.ic_baseline_speaker_24),
+                            painter = painterResource(id = iconRes),
                             contentDescription = "Output Device",
-                            tint = if (selectedDevice != null) Color.Green else Color.Gray,
-                            modifier = Modifier.size(20.dp)
+                            tint = if (selectedDevice?.isConnected == true) iconColor else Color.Gray,
+                            modifier = Modifier.size(24.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = selectedDevice?.name ?: "Internal Speaker",
-                            color = if (selectedDevice != null) Color.Green else Color.Gray,
-                            fontSize = 14.sp
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = selectedDevice?.name ?: "Phone Speaker",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = if (selectedDevice?.isConnected == true) "Connected" else "Available",
+                                color = if (selectedDevice?.isConnected == true) iconColor else Color.Gray,
+                                fontSize = 12.sp,
+                                maxLines = 1
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Select Device",
+                            tint = Color.Gray,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
