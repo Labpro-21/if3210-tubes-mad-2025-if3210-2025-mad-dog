@@ -100,20 +100,11 @@ Purrytify adalah aplikasi Android yang dibangun sebagai klon dari Spotify, menaw
 
 | NIM      | Contributions                                     | Hours |
 |----------|--------------------------------------------------|-------|
-| 13522136 | Header, Navbar, Login, Liked Songs, Search       | 8     |
-| 13522150 | Home, Profile, Background Service                | 11    |
-| 13522129 | Library, Media Player, Song Management, Network  | 14    |
+| 13522136 | Notifications, Profile Edit, Songs Recommendations     | 20     |
+| 13522150 | Audio Routing, Output Device, Share Songs(URL & QR) | 20    |
+| 13522129 | Online Songs, Download Online Songs, Sound Capsule | 20    |
 
-## Getting Started
 
-1. Clone the repository
-2. Open the project in Android Studio
-3. Build and run the application
-4. Login or create a new account to start using Purrytify
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
 
 
 
