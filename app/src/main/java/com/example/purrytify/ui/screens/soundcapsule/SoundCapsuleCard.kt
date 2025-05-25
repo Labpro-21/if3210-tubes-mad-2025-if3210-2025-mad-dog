@@ -155,7 +155,7 @@ fun SoundCapsuleCard(
                     )
                 ) {
                     DetailRow(
-                        label = "Listening streak",
+                        label = "Longest song streak",
                         value = "${soundCapsule.listeningDayStreak} days",
                         useLargerIcon = true,
                         textColor = Color.White // Sesuaikan warna teks jika perlu
@@ -224,20 +224,7 @@ fun SoundCapsuleCard(
                                     
                                     Spacer(modifier = Modifier.height(4.dp))
                                     
-                                    // Streak Info - consistent listening
-                                    Text(
-                                        text = "You've been consistently listening to this song",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Color(0xFF4CAF50)
-                                    )
-                                    
-                                    // Play count
-                                    Text(
-                                        text = "${topStreakSong.playCount} total plays",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Color(0xFF4CAF50),
-                                        fontWeight = FontWeight.Bold
-                                    )
+
                                 }
                             }
                         }

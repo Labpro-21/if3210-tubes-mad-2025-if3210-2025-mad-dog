@@ -108,7 +108,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             val artist: String?,
             val artwork: String?,
             val playDate: String,
-            val playCount: Int
+            val playCount: Int,
+            val dayCount: Int = 0
         )
     }
     
@@ -227,7 +228,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 artist = it.artist,
                 artwork = it.artwork,
                 playDate = it.mostRecentDate,
-                playCount = it.totalPlayCount
+                playCount = it.totalPlayCount,
+                dayCount = it.dayCount
             )
         }
         
