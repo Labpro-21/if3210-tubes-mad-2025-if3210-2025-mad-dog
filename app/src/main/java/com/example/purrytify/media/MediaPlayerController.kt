@@ -276,9 +276,7 @@ class MediaPlayerController private constructor(private val context: Context) {
             }
             notificationManager.createNotificationChannel(channel)
         }
-    }
-
-    private fun setupAudioFocus() {
+    }    private fun setupAudioFocus() {
         audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -289,14 +287,37 @@ class MediaPlayerController private constructor(private val context: Context) {
                         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                         .build()
                 )
+                .setAcceptsDelayedFocusGain(true)
+                .setWillPauseWhenDucked(false) // We handle ducking manually
                 .setOnAudioFocusChangeListener { focusChange ->
-                    when (focusChange) {
-                        AudioManager.AUDIOFOCUS_LOSS -> pause()
-                        AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> pause()
-                        AudioManager.AUDIOFOCUS_GAIN -> play()
-                    }
+                    handleAudioFocusChange(focusChange)
                 }
                 .build()
+        }
+    }
+    
+    private fun handleAudioFocusChange(focusChange: Int) {
+        when (focusChange) {
+            AudioManager.AUDIOFOCUS_GAIN -> {
+                Log.d(TAG, "Audio focus gained")
+                if (_currentSong.value != null && !_isPlaying.value) {
+                    play()
+                }
+            }
+            AudioManager.AUDIOFOCUS_LOSS -> {
+                Log.d(TAG, "Audio focus lost permanently")
+                pause()
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                Log.d(TAG, "Audio focus lost temporarily")
+                pause()
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                Log.d(TAG, "Audio focus lost - can duck")
+                if (_isPlaying.value) {
+                    mediaPlayer.setVolume(0.3f, 0.3f)
+                }
+            }
         }
     }
 
@@ -367,13 +388,14 @@ class MediaPlayerController private constructor(private val context: Context) {
                 AudioManager.AUDIOFOCUS_GAIN
             )
             if (result != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) return
-        }
-
-        // Reset tracking variables when we start playing
+        }        // Reset tracking variables when we start playing
         // This handles cases where a song is paused and then played again
         lastReportedPosition = mediaPlayer.currentPosition
         totalReportedDuration = 0L
 
+        // Restore normal volume in case it was ducked
+        mediaPlayer.setVolume(1.0f, 1.0f)
+        
         mediaPlayer.start()
         _isPlaying.value = true
 

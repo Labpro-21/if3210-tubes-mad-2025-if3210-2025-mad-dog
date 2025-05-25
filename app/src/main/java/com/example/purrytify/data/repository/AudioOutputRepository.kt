@@ -10,6 +10,9 @@ class AudioOutputRepository private constructor(context: Context) {
     fun getAvailableDevices(): List<AudioOutputDevice> = manager.getAvailableAudioDevices()
     fun setAudioOutput(device: AudioOutputDevice) = manager.setAudioOutput(device)
     fun routeToSpeaker() = manager.routeToSpeaker()
+    fun getCurrentOutputDevice(): AudioOutputDevice? = manager.getCurrentOutputDevice()
+    fun isBluetoothAudioActive(): Boolean = manager.isBluetoothAudioActive()
+    fun isWiredHeadsetConnected(): Boolean = manager.isWiredHeadsetConnected()
 
     companion object {
         @Volatile
@@ -20,4 +23,4 @@ class AudioOutputRepository private constructor(context: Context) {
             }
         }
     }
-} 
+}
