@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -32,12 +33,18 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun TopArtistScreen(
     viewModel: TopArtistViewModel = viewModel(),
+    year: Int = LocalDate.now().year,
+    month: Int = LocalDate.now().monthValue,
     onNavigateBack: () -> Unit
 ) {
     val topArtists by viewModel.topArtists.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
     val currentMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM yyyy"))
+
+    LaunchedEffect(year, month) {
+        viewModel.loadTopArtists(year, month)
+    }
 
     Scaffold(
         topBar = {
@@ -89,7 +96,7 @@ fun TopArtistScreen(
                             .padding(16.dp)
                     ) {
                         Text(
-                            text = currentMonth,
+                            text = viewModel.displayMonthYear.collectAsState().value ?: currentMonth,
                             color = Color.White,
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,

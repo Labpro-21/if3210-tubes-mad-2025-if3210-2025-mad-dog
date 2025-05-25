@@ -72,6 +72,10 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private val _soundCapsuleData = MutableStateFlow<SoundCapsuleViewModel?>(null)
     val soundCapsuleData: StateFlow<SoundCapsuleViewModel?> = _soundCapsuleData
 
+    // Add new state flow for multiple sound capsules
+    private val _soundCapsulesData = MutableStateFlow<List<SoundCapsuleViewModel>>(emptyList())
+    val soundCapsulesData: StateFlow<List<SoundCapsuleViewModel>> = _soundCapsulesData
+
     private val authRepository = AuthRepository.getInstance(application)
 
     private val appDatabase = AppDatabase.getDatabase(application)
@@ -86,7 +90,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         val topSong: TopSongViewModel?,
         val listeningDayStreak: Int,
         val monthYear: String,
-        val streakSongs: List<DayStreakSongViewModel>
+        val streakSongs: List<DayStreakSongViewModel>,
+        val topStreakSong: DayStreakSongViewModel?
     ) {
         data class TopSongViewModel(
             val id: Int,
@@ -125,6 +130,9 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                     // This will automatically update the UI when the database changes
                     observeSoundCapsuleData(userId, year, month)
                     
+                    // Get multiple sound capsules (up to 3) for the profile display
+                    getMultipleSoundCapsules(userId)
+                    
                     Log.d("SoundCapsuleData", "Initial data loaded and continuous observation started")
                 } catch (e: Exception) {
                     Log.e("ProfileViewModel", "Error fetching sound capsule data: ${e.message}", e)
@@ -146,6 +154,10 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 soundCapsuleDao.observeSoundCapsuleWithDetails(userId).collect { soundCapsuleData ->
                     val viewModel = convertToViewModel(soundCapsuleData)
                     _soundCapsuleData.value = viewModel
+                    
+                    // Also refresh the multiple sound capsules whenever the single one updates
+                    getMultipleSoundCapsules(userId)
+                    
                     Log.d("SoundCapsuleData", "Sound Capsule data updated: ${viewModel.totalTimeListened}ms listened")
                 }
             } catch (e: Exception) {
@@ -170,6 +182,10 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                         currentValue.totalTimeListened != viewModel.totalTimeListened ||
                         currentValue.listeningDayStreak != viewModel.listeningDayStreak) {
                         _soundCapsuleData.value = viewModel
+                        
+                        // Also refresh the multiple sound capsules when single one changes
+                        getMultipleSoundCapsules(userId)
+                        
                         Log.d("SoundCapsuleData", "Periodic refresh updated data: ${viewModel.totalTimeListened}ms listened")
                     }
                 } catch (e: Exception) {
@@ -204,6 +220,17 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             )
         }
         
+        val topStreakSong = source.topStreakSong?.let {
+            SoundCapsuleViewModel.DayStreakSongViewModel(
+                songId = it.songId,
+                name = it.name,
+                artist = it.artist,
+                artwork = it.artwork,
+                playDate = it.mostRecentDate,
+                playCount = it.totalPlayCount
+            )
+        }
+        
         val monthYear = if (capsule != null) {
             val localDate = LocalDate.of(capsule.year, capsule.month, 1)
             localDate.format(DateTimeFormatter.ofPattern("MMMM yyyy"))
@@ -217,8 +244,32 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             topSong = topSong,
             listeningDayStreak = capsule?.listeningDayStreak ?: 0,
             monthYear = monthYear,
-            streakSongs = streakSongs
+            streakSongs = streakSongs,
+            topStreakSong = topStreakSong
         )
+    }
+    
+    // New method to get multiple sound capsules
+    private suspend fun getMultipleSoundCapsules(userId: Int) {
+        try {
+            val currentDate = LocalDate.now()
+            val soundCapsules = mutableListOf<SoundCapsuleViewModel>()
+            
+            // Get up to 3 most recent capsules
+            // Use the soundCapsuleDao to get the list of all capsules, sorted by year and month
+            val allCapsules = soundCapsuleDao.getAllSoundCapsules(userId).first().take(3)
+            
+            for (capsule in allCapsules) {
+                // For each capsule, get the full details and convert to ViewModel
+                val details = soundCapsuleDao.getSoundCapsuleWithDetails(userId, capsule.year, capsule.month)
+                soundCapsules.add(convertToViewModel(details))
+            }
+            
+            _soundCapsulesData.value = soundCapsules
+            Log.d("SoundCapsuleData", "Loaded ${soundCapsules.size} sound capsules")
+        } catch (e: Exception) {
+            Log.e("ProfileViewModel", "Error fetching multiple sound capsules: ${e.message}", e)
+        }
     }
     
     fun getProfile() {

@@ -27,6 +27,8 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun ListeningStatsScreen(
     viewModel: ListeningStatsViewModel = viewModel(),
+    year: Int = LocalDate.now().year,
+    month: Int = LocalDate.now().monthValue,
     onNavigateBack: () -> Unit
 ) {
     val stats by viewModel.dailyStats.collectAsState()
@@ -36,6 +38,10 @@ fun ListeningStatsScreen(
 
     LaunchedEffect(Unit) {
         viewModel.loadDailyStats()
+    }
+
+    LaunchedEffect(year, month) {
+        viewModel.loadDailyStats(year, month)
     }
 
     Scaffold(

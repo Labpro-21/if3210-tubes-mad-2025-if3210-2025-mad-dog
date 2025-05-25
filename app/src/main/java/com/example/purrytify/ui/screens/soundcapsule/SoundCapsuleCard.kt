@@ -88,7 +88,9 @@ fun SoundCapsuleCard(
                     text = soundCapsule.monthYear,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 18.sp
+                    fontSize = 20.sp,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -163,19 +165,89 @@ fun SoundCapsuleCard(
                 // Streak Section
                 if (soundCapsule.streakSongs.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Listening Streak",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
                     
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(soundCapsule.streakSongs.take(soundCapsule.listeningDayStreak)) { streakSong ->
-                            StreakSongCard(streakSong)
+                    // Check if we have a top streak song (played for 2+ days)
+                    if (soundCapsule.topStreakSong != null) {
+                        val topStreakSong = soundCapsule.topStreakSong
+                        Text(
+                            text = "Top Streak Song",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        // Show only the top streak song with info that it's been played consistently
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF383838))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Song Artwork
+                                AsyncImage(
+                                    model = topStreakSong.artwork,
+                                    contentDescription = "Song artwork",
+                                    modifier = Modifier
+                                        .size(70.dp)
+                                        .clip(RoundedCornerShape(4.dp)),
+                                    contentScale = ContentScale.Crop,
+                                    placeholder = painterResource(id = R.drawable.music_placeholder),
+                                    error = painterResource(id = R.drawable.music_placeholder)
+                                )
+                                
+                                Spacer(modifier = Modifier.width(12.dp))
+                                
+                                Column(
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    // Song Name
+                                    Text(
+                                        text = topStreakSong.name ?: "Unknown Song",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = Color.White,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    
+                                    // Artist Name
+                                    Text(
+                                        text = topStreakSong.artist ?: "Unknown Artist",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color.Gray,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    
+                                    // Streak Info - consistent listening
+                                    Text(
+                                        text = "You've been consistently listening to this song",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFF4CAF50)
+                                    )
+                                    
+                                    // Play count
+                                    Text(
+                                        text = "${topStreakSong.playCount} total plays",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFF4CAF50),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
                         }
+                    } else {
+                        // If no top streak song, display a message
+                        Text(
+                            text = "No consistent listening pattern detected yet",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.Gray
+                        )
                     }
                 }
             } else {
@@ -323,72 +395,6 @@ fun TopArtistSongCard(
                     modifier = Modifier
                         .size(50.dp)
                         .clip(CircleShape)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun StreakSongCard(streakSong: SoundCapsuleViewModel.DayStreakSongViewModel) {
-    Card(
-        modifier = Modifier
-            .width(120.dp)
-            .height(160.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF383838))
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Song Artwork
-            AsyncImage(
-                model = streakSong.artwork,
-                contentDescription = "Song artwork",
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                contentScale = ContentScale.Crop,
-                placeholder = painterResource(id = R.drawable.music_placeholder),
-                error = painterResource(id = R.drawable.music_placeholder)
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // Song Name
-            Text(
-                text = streakSong.name ?: "No song played",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            
-            // Artist Name
-            Text(
-                text = streakSong.artist ?: "-",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            
-            // Play Date
-            Text(
-                text = streakSong.playDate,
-                style = MaterialTheme.typography.labelSmall,
-                color = if (streakSong.playCount > 0) Color(0xFF4CAF50) else Color.Gray,
-                maxLines = 1
-            )
-            
-            if (streakSong.playCount > 0) {
-                Text(
-                    text = "${streakSong.playCount} plays",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF4CAF50),
-                    maxLines = 1
                 )
             }
         }

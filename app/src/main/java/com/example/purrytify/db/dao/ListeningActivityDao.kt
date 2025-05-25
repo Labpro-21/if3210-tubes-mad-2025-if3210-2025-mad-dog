@@ -176,6 +176,25 @@ interface ListeningActivityDao {
     """)
     suspend fun getDailyListeningStatsLastMonth(userId: Int): List<DailyListeningStats>
 
+    @Query("""
+        SELECT 
+            DATE(la.startTime / 1000, 'unixepoch', 'localtime') as date,
+            ROUND(CAST(SUM(la.duration) AS FLOAT) / 60000.0, 2) as totalMinutes
+        FROM listening_activity la
+        WHERE la.userId = :userId
+        AND strftime('%Y', la.startTime / 1000, 'unixepoch', 'localtime') = :year
+        AND strftime('%m', la.startTime / 1000, 'unixepoch', 'localtime') = :month
+        GROUP BY DATE(la.startTime / 1000, 'unixepoch', 'localtime')
+        ORDER BY date ASC
+    """)
+    suspend fun getDailyListeningStatsByYearMonth(userId: Int, year: String, month: String): List<DailyListeningStats>
+
+    suspend fun getDailyListeningStatsByMonth(userId: Int, year: Int, month: Int): List<DailyListeningStats> {
+        val yearStr = year.toString()
+        val monthStr = month.toString().padStart(2, '0')
+        return getDailyListeningStatsByYearMonth(userId, yearStr, monthStr)
+    }
+
     // Data class for monthly played songs
     data class MonthlyPlayedSong(
         val name: String,
@@ -202,6 +221,31 @@ interface ListeningActivityDao {
     )
     suspend fun getMonthlyPlayedSongs(userId: Int): List<MonthlyPlayedSong>
 
+    @Query(
+        """
+        SELECT 
+            COALESCE(s.name, la.songName) as name, 
+            COALESCE(s.artist, la.songArtist) as artist, 
+            s.artwork, 
+            COUNT(la.id) AS playCount
+        FROM listening_activity la
+        LEFT JOIN songs s ON la.songId = s.id
+        WHERE la.userId = :userId
+        AND strftime('%Y', la.startTime / 1000, 'unixepoch', 'localtime') = :year
+        AND strftime('%m', la.startTime / 1000, 'unixepoch', 'localtime') = :month
+        AND la.completed = 1
+        GROUP BY name, artist, s.artwork
+        ORDER BY playCount DESC
+        """
+    )
+    suspend fun getMonthlyPlayedSongsByYearMonth(userId: Int, year: String, month: String): List<MonthlyPlayedSong>
+
+    suspend fun getMonthlyPlayedSongsByMonth(userId: Int, year: Int, month: Int): List<MonthlyPlayedSong> {
+        val yearStr = year.toString()
+        val monthStr = month.toString().padStart(2, '0')
+        return getMonthlyPlayedSongsByYearMonth(userId, yearStr, monthStr)
+    }
+
     // Data class for monthly artist statistics
     data class MonthlyArtistStats(
         val artist: String,
@@ -225,4 +269,28 @@ interface ListeningActivityDao {
         """
     )
     suspend fun getMonthlyArtistsStats(userId: Int): List<MonthlyArtistStats>
+
+    @Query(
+        """
+        SELECT 
+            COALESCE(s.artist, la.songArtist) as artist,
+            COUNT(DISTINCT la.id) as playCount,
+            MAX(s.artwork) as artwork
+        FROM listening_activity la
+        LEFT JOIN songs s ON la.songId = s.id
+        WHERE la.userId = :userId
+        AND strftime('%Y', la.startTime / 1000, 'unixepoch', 'localtime') = :year
+        AND strftime('%m', la.startTime / 1000, 'unixepoch', 'localtime') = :month
+        AND la.completed = 1
+        GROUP BY artist
+        ORDER BY playCount DESC
+        """
+    )
+    suspend fun getMonthlyArtistsStatsByYearMonth(userId: Int, year: String, month: String): List<MonthlyArtistStats>
+
+    suspend fun getMonthlyArtistsStatsByMonth(userId: Int, year: Int, month: Int): List<MonthlyArtistStats> {
+        val yearStr = year.toString()
+        val monthStr = month.toString().padStart(2, '0')
+        return getMonthlyArtistsStatsByYearMonth(userId, yearStr, monthStr)
+    }
 }
