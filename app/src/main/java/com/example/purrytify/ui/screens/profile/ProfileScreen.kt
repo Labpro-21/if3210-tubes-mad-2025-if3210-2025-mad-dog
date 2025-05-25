@@ -76,9 +76,9 @@ fun ProfileScreen(
     viewModel: ProfileViewModel = viewModel(),
     onNavigateToSettings: () -> Unit = {},
     onNavigateToEditProfile: () -> Unit = {},
-    onNavigateToListeningStats: () -> Unit = {},
-    onNavigateToTopSongs: () -> Unit = {},
-    onNavigateToTopArtist: () -> Unit = {}
+    onNavigateToListeningStats: (Int, Int) -> Unit = { _, _ -> },
+    onNavigateToTopSongs: (Int, Int) -> Unit = { _, _ -> },
+    onNavigateToTopArtist: (Int, Int) -> Unit = { _, _ -> }
 ) {
     val profile by viewModel.profile.collectAsState()
     val songsCount by viewModel.songsCount.collectAsState()
@@ -91,6 +91,7 @@ fun ProfileScreen(
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val scrollState = rememberScrollState()
     val soundCapsuleData by viewModel.soundCapsuleData.collectAsState()
+    val soundCapsulesData by viewModel.soundCapsulesData.collectAsState()
     val context = LocalContext.current
 
     // State for showing permission dialog
@@ -259,22 +260,54 @@ fun ProfileScreen(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Update SoundCapsuleCard with new download handler
-                SoundCapsuleCard(
-                    soundCapsule = soundCapsuleData,
-                    onTimeListenedClick = onNavigateToListeningStats,
-                    onTopSongClick = onNavigateToTopSongs,
-                    onTopArtistClick = onNavigateToTopArtist,
-                    onDownloadClick = {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                            // Android 10 (API 29) and above don't need storage permission for Downloads
-                            handleCsvDownload(context, soundCapsuleData)
-                        } else {
-                            // For older versions, request permission
-                            permissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                        }
+                // Display multiple Sound Capsule cards (up to 3)
+                if (soundCapsulesData.isNotEmpty()) {
+                    soundCapsulesData.forEach { capsule ->
+                        // Extract year and month from the monthYear string (format: "MMMM yyyy")
+                        val parts = capsule.monthYear.split(" ")
+                        val monthName = parts[0]
+                        val year = parts[1].toInt()
+                        val month = getMonthNumber(monthName)
+                        
+                        SoundCapsuleCard(
+                            soundCapsule = capsule,
+                            onTimeListenedClick = { onNavigateToListeningStats(year, month) },
+                            onTopSongClick = { onNavigateToTopSongs(year, month) },
+                            onTopArtistClick = { onNavigateToTopArtist(year, month) },
+                            onDownloadClick = {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                    // Android 10 (API 29) and above don't need storage permission for Downloads
+                                    handleCsvDownload(context, capsule)
+                                } else {
+                                    // For older versions, request permission
+                                    permissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                                }
+                            }
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
-                )
+                } else {
+                    // Fallback to the old implementation with a single card if the list is empty
+                    val currentDate = java.time.LocalDate.now()
+                    val year = currentDate.year
+                    val month = currentDate.monthValue
+                    
+                    SoundCapsuleCard(
+                        soundCapsule = soundCapsuleData,
+                        onTimeListenedClick = { onNavigateToListeningStats(year, month) },
+                        onTopSongClick = { onNavigateToTopSongs(year, month) },
+                        onTopArtistClick = { onNavigateToTopArtist(year, month) },
+                        onDownloadClick = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                // Android 10 (API 29) and above don't need storage permission for Downloads
+                                handleCsvDownload(context, soundCapsuleData)
+                            } else {
+                                // For older versions, request permission
+                                permissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                            }
+                        }
+                    )
+                }
             }
         }
     }
@@ -409,5 +442,23 @@ private fun handleCsvDownload(context: Context, soundCapsule: ProfileViewModel.S
                 ).show()
             }
         }
+    }
+}
+
+private fun getMonthNumber(monthName: String): Int {
+    return when (monthName.lowercase()) {
+        "january" -> 1
+        "february" -> 2
+        "march" -> 3
+        "april" -> 4
+        "may" -> 5
+        "june" -> 6
+        "july" -> 7
+        "august" -> 8
+        "september" -> 9
+        "october" -> 10
+        "november" -> 11
+        "december" -> 12
+        else -> java.time.LocalDate.now().monthValue // fallback to current month
     }
 }

@@ -45,11 +45,104 @@ interface SoundCapsuleDao {
     @Query("SELECT * FROM day_streak_songs WHERE capsuleId = :capsuleId ORDER BY date DESC")
     fun observeDayStreakSongs(capsuleId: Int): Flow<List<DayStreakSong>>
     
+    /**
+     * Gets the top streak song based on consecutive days played.
+     * This query gets the raw data that will be processed by the streak calculation algorithm.
+     */
+    @Query("""
+        SELECT 
+            ds.songId,
+            s.name,
+            s.artist,
+            s.artwork,
+            MAX(ds.date) as mostRecentDate,
+            SUM(ds.playCount) as totalPlayCount,
+            COUNT(DISTINCT ds.date) as dayCount
+        FROM day_streak_songs ds
+        LEFT JOIN songs s ON ds.songId = s.id
+        WHERE ds.capsuleId = :capsuleId AND ds.songId IS NOT NULL
+        GROUP BY ds.songId
+        ORDER BY dayCount DESC, totalPlayCount DESC
+        LIMIT 10
+    """)
+    suspend fun getTopStreakSongCandidates(capsuleId: Int): List<TopStreakSong>
+    
+    /**
+     * Gets the top streak song with the longest consecutive day streak
+     */
+    suspend fun getTopStreakSongForDisplay(capsuleId: Int): TopStreakSong? {
+        // Get all streak songs for this capsule
+        val allStreakSongs = getDayStreakSongsByCapsuleId(capsuleId)
+        
+        // Group by song ID
+        val songsBySongId = allStreakSongs.groupBy { it.songId }
+        
+        // Track the song with the longest streak
+        var maxStreak = 0
+        var topStreakSongId: Int? = null
+        
+        songsBySongId.forEach { (songId, songsForId) ->
+            // Skip null songIds
+            if (songId == null) return@forEach
+            
+            // Parse and sort dates
+            val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
+            val sortedDates = songsForId.map { LocalDate.parse(it.date, dateFormatter) }
+                .sorted()
+            
+            if (sortedDates.isEmpty()) return@forEach
+            
+            var currentStreak = 1
+            var longestStreak = 1
+            
+            // Check for consecutive dates
+            for (i in 1 until sortedDates.size) {
+                val previousDate = sortedDates[i-1]
+                val currentDate = sortedDates[i]
+                
+                // If dates are consecutive
+                if (previousDate.plusDays(1) == currentDate) {
+                    currentStreak++
+                    longestStreak = maxOf(longestStreak, currentStreak)
+                } else {
+                    // Break in the streak
+                    currentStreak = 1
+                }
+            }
+            
+            // Update max streak if this song has a longer streak
+            if (longestStreak > maxStreak) {
+                maxStreak = longestStreak
+                topStreakSongId = songId
+            }
+        }
+        
+        // If we found a song with a streak of at least 2 days
+        if (maxStreak >= 2 && topStreakSongId != null) {
+            // Get the song details from the candidates query
+            val candidates = getTopStreakSongCandidates(capsuleId)
+            return candidates.find { it.songId == topStreakSongId }
+        }
+        
+        return null
+    }
+
+    data class TopStreakSong(
+        val songId: Int?,
+        val name: String?,
+        val artist: String?,
+        val artwork: String?,
+        val mostRecentDate: String,
+        val totalPlayCount: Int,
+        val dayCount: Int
+    )
+    
     data class SoundCapsuleWithSongs(
         val userId: Int,
         val soundCapsule: SoundCapsule? = null,
         val streakSongs: List<DayStreakSongWithDetails> = emptyList(),
-        val topSong: TopSongDetails? = null
+        val topSong: TopSongDetails? = null,
+        val topStreakSong: TopStreakSong? = null
     )
     
     data class DayStreakSongWithDetails(
@@ -114,11 +207,15 @@ interface SoundCapsuleDao {
                 null
             }
             
+            // Get Top Streak Song
+            val topStreakSong = getTopStreakSongForDisplay(capsule.id)
+            
             return SoundCapsuleWithSongs(
                 userId = userId,
                 soundCapsule = capsule,
                 streakSongs = streakSongsWithDetails,
-                topSong = topSong
+                topSong = topSong,
+                topStreakSong = topStreakSong
             )
         }
         
@@ -172,40 +269,22 @@ interface SoundCapsuleDao {
     suspend fun getTopSongThisMonth(userId: Int): TopSongDetails?
 
     @Query("""
-        WITH RECURSIVE dates(date) AS (
-            SELECT DATE('now', 'localtime')
-            UNION ALL
-            SELECT DATE(date, '-1 day')
-            FROM dates
-            WHERE date > DATE('now', 'localtime', '-30 days')
-        ),
-        daily_plays AS (
-            SELECT 
-                la.songId as songId,
-                COALESCE(s.name, la.songName) as name,
-                COALESCE(s.artist, la.songArtist) as artist,
-                s.artwork as artwork,
-                DATE(la.startTime / 1000, 'unixepoch', 'localtime') as playDate,
-                COUNT(*) as playCount
-            FROM listening_activity la
-            LEFT JOIN songs s ON la.songId = s.id
-            WHERE la.userId = :userId
-            AND la.completed = 1
-            AND DATE(la.startTime / 1000, 'unixepoch', 'localtime') >= DATE('now', 'localtime', '-30 days')
-            GROUP BY songId, name, artist, artwork, playDate
-        )
         SELECT 
-            daily_plays.songId as songId,
-            daily_plays.name as name,
-            daily_plays.artist as artist,
-            daily_plays.artwork as artwork,
-            dates.date as playDate,
-            COALESCE(daily_plays.playCount, 0) as playCount
-        FROM dates
-        LEFT JOIN daily_plays ON dates.date = daily_plays.playDate
-        ORDER BY dates.date DESC
+            la.songId as songId,
+            COALESCE(s.name, la.songName) as name,
+            COALESCE(s.artist, la.songArtist) as artist,
+            s.artwork as artwork,
+            DATE(la.startTime / 1000, 'unixepoch', 'localtime') as playDate,
+            COUNT(*) as playCount
+        FROM listening_activity la
+        LEFT JOIN songs s ON la.songId = s.id
+        WHERE la.userId = :userId
+        AND la.completed = 1
+        AND DATE(la.startTime / 1000, 'unixepoch', 'localtime') >= DATE('now', 'localtime', '-30 days')
+        GROUP BY songId, name, artist, artwork, playDate
+        ORDER BY playDate DESC
     """)
-    suspend fun getDayStreakSongs(userId: Int): List<DayStreakSongData>
+    suspend fun getPlayedSongsForDayStreak(userId: Int): List<DayStreakSongData>
 
     data class DayStreakSongData(
         val songId: Int?,
@@ -216,24 +295,50 @@ interface SoundCapsuleDao {
         val playCount: Int
     )
 
-    // Calculate day streak from streak songs
+    // Calculate day streak from played songs data
     private fun calculateDayStreak(streakSongs: List<DayStreakSongData>): Int {
         if (streakSongs.isEmpty()) return 0
-
-        var currentStreak = 0
-        var currentDate = LocalDate.now()
-
-        for (song in streakSongs) {
-            val songDate = LocalDate.parse(song.playDate)
-            if (songDate == currentDate && song.playCount > 0) {
-                currentStreak++
-                currentDate = currentDate.minusDays(1)
-            } else if (song.playCount == 0) {
-                break
+        
+        // Group songs by songId first
+        val songsBySongId = streakSongs.groupBy { it.songId }
+        
+        // Find the song with the longest consecutive day streak
+        var maxStreak = 0
+        
+        songsBySongId.forEach { (songId, songsForId) ->
+            // Skip null songIds
+            if (songId == null) return@forEach
+            
+            // Group by date and sort dates
+            val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
+            val sortedDates = songsForId.map { LocalDate.parse(it.playDate, dateFormatter) }
+                .sorted() // Sort in ascending order
+            
+            if (sortedDates.isEmpty()) return@forEach
+            
+            var currentStreak = 1
+            var longestStreak = 1
+            
+            // Check for consecutive dates
+            for (i in 1 until sortedDates.size) {
+                val previousDate = sortedDates[i-1]
+                val currentDate = sortedDates[i]
+                
+                // If dates are consecutive
+                if (previousDate.plusDays(1) == currentDate) {
+                    currentStreak++
+                    longestStreak = maxOf(longestStreak, currentStreak)
+                } else {
+                    // Break in the streak
+                    currentStreak = 1
+                }
             }
+            
+            // Update max streak if this song has a longer streak
+            maxStreak = maxOf(maxStreak, longestStreak)
         }
-
-        return currentStreak
+        
+        return maxStreak
     }
     
     @Transaction
@@ -253,7 +358,7 @@ interface SoundCapsuleDao {
         val totalTimeListened = getTotalListeningTimeThisMonth(userId)
         val topArtist = getTopArtistThisMonth(userId)
         val topSong = getTopSongThisMonth(userId)
-        val streakSongs = getDayStreakSongs(userId)
+        val streakSongs = getPlayedSongsForDayStreak(userId)
         val dayStreak = calculateDayStreak(streakSongs)
         
         if (existingSoundCapsule == null) {
@@ -367,9 +472,9 @@ interface SoundCapsuleDao {
             updateSoundCapsule(updatedCapsule)
         }
         
-        // If song completed, update day streak songs for today
+        // If song completed, add it to the day streak songs for today
         if (isComplete && soundCapsule != null) {
-            updateTodayStreakSong(soundCapsule.id, songId)
+            addCompletedSongToStreak(soundCapsule.id, songId)
         }
         
         // Always refresh the top songs and artists data on completed songs,
@@ -424,21 +529,21 @@ interface SoundCapsuleDao {
         }
     }
 
-    private suspend fun updateTodayStreakSong(capsuleId: Int, songId: Int) {
+    private suspend fun addCompletedSongToStreak(capsuleId: Int, songId: Int) {
         val today = LocalDate.now().toString()
         
-        // Check if we have a streak song for today
-        val existingStreakSong = getDayStreakSongForDate(capsuleId, today)
+        // Check if we already have an entry for this song today
+        val existingSongs = getDayStreakSongsForDateAndSong(capsuleId, today, songId)
         
-        if (existingStreakSong != null) {
-            // Update existing streak song
-            val updatedStreakSong = existingStreakSong.copy(
-                songId = songId,
-                playCount = existingStreakSong.playCount + 1
+        if (existingSongs.isNotEmpty()) {
+            // Update the play count for the existing song
+            val existingSong = existingSongs.first()
+            val updatedSong = existingSong.copy(
+                playCount = existingSong.playCount + 1
             )
-            updateDayStreakSong(updatedStreakSong)
+            updateDayStreakSong(updatedSong)
         } else {
-            // Create new streak song for today
+            // Create a new record for this song
             val newStreakSong = DayStreakSong(
                 capsuleId = capsuleId,
                 songId = songId,
@@ -452,27 +557,32 @@ interface SoundCapsuleDao {
         updateListeningDayStreak(capsuleId)
     }
 
-    @Query("SELECT * FROM day_streak_songs WHERE capsuleId = :capsuleId AND date = :date LIMIT 1")
-    suspend fun getDayStreakSongForDate(capsuleId: Int, date: String): DayStreakSong?
+    @Query("SELECT * FROM day_streak_songs WHERE capsuleId = :capsuleId AND date = :date AND songId = :songId")
+    suspend fun getDayStreakSongsForDateAndSong(capsuleId: Int, date: String, songId: Int): List<DayStreakSong>
+
+    @Query("SELECT * FROM day_streak_songs WHERE capsuleId = :capsuleId AND date = :date")
+    suspend fun getDayStreakSongsForDate(capsuleId: Int, date: String): List<DayStreakSong>
 
     @Update
     suspend fun updateDayStreakSong(dayStreakSong: DayStreakSong)
 
     private suspend fun updateListeningDayStreak(capsuleId: Int) {
         val soundCapsule = getSoundCapsuleById(capsuleId) ?: return
-        val streakSongs = getDayStreakSongsByCapsuleId(capsuleId)
         
-        // Convert to the format needed for streak calculation
-        val streakSongsData = streakSongs.map { streakSong ->
+        // Get all streak songs
+        val allStreakSongs = getDayStreakSongsByCapsuleId(capsuleId)
+        
+        // Group by songId and date to prepare for streak calculation
+        val streakSongsData = allStreakSongs.map { song ->
             DayStreakSongData(
-                songId = streakSong.songId,
+                songId = song.songId,
                 name = null,
                 artist = null,
                 artwork = null,
-                playDate = streakSong.date,
-                playCount = streakSong.playCount
+                playDate = song.date,
+                playCount = song.playCount
             )
-        }.sortedByDescending { it.playDate }
+        }
         
         val dayStreak = calculateDayStreak(streakSongsData)
         

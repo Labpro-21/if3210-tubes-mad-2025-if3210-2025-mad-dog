@@ -14,6 +14,7 @@ import com.example.purrytify.db.dao.UsersDao
 import com.example.purrytify.db.entity.Users
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.firstOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
@@ -125,11 +126,21 @@ class ProfileRepository private constructor(
     }
 
     suspend fun getSongsCount():Int = withContext(Dispatchers.IO){
-        return@withContext songsdao.getSongsAmount();
-    };
+        val userId = authRepository.currentUserId
+        return@withContext if (userId != null) {
+            songsdao.getAllSongsForUser(userId).firstOrNull()?.size ?: 0
+        } else {
+            0
+        }
+    }
 
     suspend fun getSongsLiked():Int = withContext(Dispatchers.IO) {
-        return@withContext songsdao.getFavoriteSongsAmount();
+        val userId = authRepository.currentUserId
+        return@withContext if (userId != null) {
+            songsdao.getFavoriteSongsForUser(userId).firstOrNull()?.size ?: 0
+        } else {
+            0
+        }
     }
     suspend fun getTotalListened(): Int = withContext(Dispatchers.IO) {
         return@withContext usersdao.getTotalPlayedById(authRepository.currentUserId) ?: 0

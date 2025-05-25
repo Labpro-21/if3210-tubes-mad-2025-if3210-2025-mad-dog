@@ -28,6 +28,9 @@ class TopArtistViewModel(application: Application) : AndroidViewModel(applicatio
     val error: StateFlow<String?> = _error
 
     private val TAG = "TopArtistViewModel"
+    
+    private val _displayMonthYear = MutableStateFlow<String?>(null)
+    val displayMonthYear: StateFlow<String?> = _displayMonthYear
 
     init {
         loadTopArtists()
@@ -47,6 +50,32 @@ class TopArtistViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             } catch (e: Exception) {
                 _error.value = e.message ?: "Failed to load top artists"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun loadTopArtists(year: Int = java.time.LocalDate.now().year, month: Int = java.time.LocalDate.now().monthValue) {
+        viewModelScope.launch {
+            try {
+                _isLoading.value = true
+                _error.value = null
+                val userId = authRepository.currentUserId
+                if (userId != null) {
+                    // Update the display month and year
+                    val date = java.time.LocalDate.of(year, month, 1)
+                    _displayMonthYear.value = date.format(java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy"))
+                    
+                    // Get artists for specific month and year
+                    val artists = repository.getMonthlyArtistsStats(userId, year, month)
+                    Log.d(TAG, "Artists for $month/$year: ${artists.size}")
+                    
+                    _topArtists.value = artists
+                }
+            } catch (e: Exception) {
+                _error.value = e.message ?: "Failed to load top artists"
+                Log.e(TAG, "Error loading artists: ${e.message}", e)
             } finally {
                 _isLoading.value = false
             }

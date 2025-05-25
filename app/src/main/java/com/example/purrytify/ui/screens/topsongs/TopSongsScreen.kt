@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -22,20 +23,28 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.purrytify.R
+import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TopSongsScreen(
     onNavigateBack: () -> Unit,
+    year: Int = LocalDate.now().year,
+    month: Int = LocalDate.now().monthValue,
     viewModel: TopSongsViewModel = viewModel()
 ) {
     val topSongs by viewModel.topSongs.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val currentMonthYear by viewModel.monthYear.collectAsState()
+    
+    LaunchedEffect(year, month) {
+        viewModel.loadTopSongs(year, month)
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Your Top Songs This Month") },
+                title = { Text(currentMonthYear ?: "Your Top Songs") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")

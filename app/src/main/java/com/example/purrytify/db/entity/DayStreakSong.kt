@@ -24,7 +24,7 @@ import androidx.room.PrimaryKey
     indices = [
         Index(value = ["capsuleId"]),
         Index(value = ["songId"]),
-        Index(value = ["capsuleId", "date"], unique = true)
+        Index(value = ["capsuleId", "date", "songId"], unique = true)
     ]
 )
 data class DayStreakSong(

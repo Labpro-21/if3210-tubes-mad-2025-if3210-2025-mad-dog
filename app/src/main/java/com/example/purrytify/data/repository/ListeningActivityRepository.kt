@@ -39,25 +39,6 @@ class ListeningActivityRepository private constructor(
         return listeningActivityDao.getById(id)
     }
 
-    suspend fun getAllByUserId(userId: Int): List<ListeningActivity> {
-        return listeningActivityDao.getAllByUserId(userId)
-    }
-
-    suspend fun getTotalListeningTimeThisMonth(userId: Int): Long {
-        return listeningActivityDao.getTotalListeningTimeThisMonth(userId)
-    }
-
-    suspend fun getTopArtistThisMonth(userId: Int): ListeningActivityDao.TopArtist? {
-        return listeningActivityDao.getTopArtistThisMonth(userId)
-    }
-
-    suspend fun getTopSongThisMonth(userId: Int): ListeningActivityDao.TopSongComplete? {
-        return listeningActivityDao.getTopSongThisMonth(userId)
-    }
-
-    suspend fun getRecentListeningActivity(userId: Int): List<ListeningActivityDao.RecentPlayRecord> {
-        return listeningActivityDao.getRecentListeningActivity(userId)
-    }
 
     suspend fun getDailyListeningData(userId: Int): List<ListeningActivityDao.DailyListeningStats>{
         return listeningActivityDao.getDailyListeningStatsLastMonth(userId)
@@ -69,5 +50,29 @@ class ListeningActivityRepository private constructor(
 
     suspend fun getMonthlyArtistsStats(userId: Int): List<ListeningActivityDao.MonthlyArtistStats> {
         return listeningActivityDao.getMonthlyArtistsStats(userId)
+    }
+
+    suspend fun getDailyListeningData(userId: Int, year: Int? = null, month: Int? = null): List<ListeningActivityDao.DailyListeningStats>{
+        return if (year != null && month != null) {
+            listeningActivityDao.getDailyListeningStatsByMonth(userId, year, month)
+        } else {
+            listeningActivityDao.getDailyListeningStatsLastMonth(userId)
+        }
+    }
+
+    suspend fun getMonthlyPlayedSongs(userId: Int, year: Int? = null, month: Int? = null): List<ListeningActivityDao.MonthlyPlayedSong>{
+        return if (year != null && month != null) {
+            listeningActivityDao.getMonthlyPlayedSongsByMonth(userId, year, month)
+        } else {
+            listeningActivityDao.getMonthlyPlayedSongs(userId)
+        }
+    }
+
+    suspend fun getMonthlyArtistsStats(userId: Int, year: Int? = null, month: Int? = null): List<ListeningActivityDao.MonthlyArtistStats> {
+        return if (year != null && month != null) {
+            listeningActivityDao.getMonthlyArtistsStatsByMonth(userId, year, month)
+        } else {
+            listeningActivityDao.getMonthlyArtistsStats(userId)
+        }
     }
 }

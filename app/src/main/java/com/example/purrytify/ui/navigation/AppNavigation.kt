@@ -42,6 +42,8 @@ import com.example.purrytify.ui.screens.topsongs.TopSongsScreen
 import com.example.purrytify.ui.screens.topartist.TopArtistScreen
 import com.example.purrytify.ui.theme.SpotifyBlack
 import com.example.purrytify.ui.screens.songdetail.SongDetailViewModel
+import java.time.LocalDate
+
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
@@ -53,9 +55,9 @@ sealed class Screen(val route: String) {
     object Album: Screen("album/{region}")
     object EditProfile : Screen("editProfile")
     object LocationPicker : Screen("locationPicker")
-    object ListeningStats: Screen("listeningstats")
-    object TopSongs: Screen("topsongs")
-    object TopArtist: Screen("topartist")
+    object ListeningStats: Screen("listeningstats/{year}/{month}")
+    object TopSongs: Screen("topsongs/{year}/{month}")
+    object TopArtist: Screen("topartist/{year}/{month}")
 }
 
 @Composable
@@ -192,14 +194,14 @@ fun AppNavigation(
                         onNavigateToEditProfile = {
                             navController.navigate(Screen.EditProfile.route)
                         },
-                        onNavigateToListeningStats = {
-                            navController.navigate(Screen.ListeningStats.route)
+                        onNavigateToListeningStats = { year, month ->
+                            navController.navigate("listeningstats/$year/$month")
                         },
-                        onNavigateToTopSongs = {
-                            navController.navigate(Screen.TopSongs.route)
+                        onNavigateToTopSongs = { year, month ->
+                            navController.navigate("topsongs/$year/$month")
                         },
-                        onNavigateToTopArtist = {
-                            navController.navigate(Screen.TopArtist.route)
+                        onNavigateToTopArtist = { year, month ->
+                            navController.navigate("topartist/$year/$month")
                         }
                     )
                     
@@ -252,8 +254,19 @@ fun AppNavigation(
                         }
                     )
                 }
-                composable(Screen.ListeningStats.route) {
+                composable(
+                    route = Screen.ListeningStats.route,
+                    arguments = listOf(
+                        navArgument("year") { type = NavType.IntType },
+                        navArgument("month") { type = NavType.IntType }
+                    )
+                ) { backStackEntry ->
+                    val year = backStackEntry.arguments?.getInt("year") ?: LocalDate.now().year
+                    val month = backStackEntry.arguments?.getInt("month") ?: LocalDate.now().monthValue
+                    
                     ListeningStatsScreen(
+                        year = year,
+                        month = month,
                         onNavigateBack = {
                             navController.popBackStack()
                         }
@@ -373,16 +386,38 @@ fun AppNavigation(
                     )
                 }
 
-                composable(Screen.TopSongs.route) {
+                composable(
+                    route = Screen.TopSongs.route,
+                    arguments = listOf(
+                        navArgument("year") { type = NavType.IntType },
+                        navArgument("month") { type = NavType.IntType }
+                    )
+                ) { backStackEntry ->
+                    val year = backStackEntry.arguments?.getInt("year") ?: LocalDate.now().year
+                    val month = backStackEntry.arguments?.getInt("month") ?: LocalDate.now().monthValue
+                    
                     TopSongsScreen(
+                        year = year,
+                        month = month,
                         onNavigateBack = {
                             navController.popBackStack()
                         }
                     )
                 }
 
-                composable(Screen.TopArtist.route) {
+                composable(
+                    route = Screen.TopArtist.route,
+                    arguments = listOf(
+                        navArgument("year") { type = NavType.IntType },
+                        navArgument("month") { type = NavType.IntType }
+                    )
+                ) { backStackEntry ->
+                    val year = backStackEntry.arguments?.getInt("year") ?: LocalDate.now().year
+                    val month = backStackEntry.arguments?.getInt("month") ?: LocalDate.now().monthValue
+                    
                     TopArtistScreen(
+                        year = year,
+                        month = month,
                         onNavigateBack = {
                             navController.popBackStack()
                         }
