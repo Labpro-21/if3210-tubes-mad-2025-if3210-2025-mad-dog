@@ -77,6 +77,7 @@ import androidx.navigation.compose.rememberNavController
 import coil.compose.rememberAsyncImagePainter
 import com.example.purrytify.R
 import com.example.purrytify.ui.theme.SpotifyGreen
+import com.example.purrytify.utils.CountryCodeValidator
 import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
@@ -103,16 +104,31 @@ fun EditProfileScreen(
     var showPhotoPickerDialog by remember { mutableStateOf(false) }
     var locationInput by remember { mutableStateOf(profile?.location ?: "") }
     var selectedCountryName by remember { mutableStateOf<String?>(null) }
-    var tempCameraUri by remember { mutableStateOf<Uri?>(null) }    
+    var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
+    var validationResult by remember { mutableStateOf(CountryCodeValidator.ValidationResult(false, "", null)) }
+    var hasUserInteracted by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         viewModel.getProfile()
     }
-    
-    // Handle country code and country name from navigation parameters
+      // Handle country code and country name from navigation parameters
     LaunchedEffect(countryCode, countryName) {
         if (!countryCode.isNullOrEmpty()) {
             locationInput = countryCode
             selectedCountryName = countryName
+            validationResult = CountryCodeValidator.validateAndFormat(countryCode)
+        }
+    }
+    
+    // Validate location input whenever it changes
+    LaunchedEffect(locationInput) {
+        if (hasUserInteracted) {
+            validationResult = CountryCodeValidator.validateAndFormat(locationInput)
+            // Update selectedCountryName from validation result if available
+            if (validationResult.isValid && validationResult.countryName != null) {
+                selectedCountryName = validationResult.countryName
+            } else if (!validationResult.isValid) {
+                selectedCountryName = null
+            }
         }
     }
     
@@ -212,15 +228,26 @@ fun EditProfileScreen(
         currentLocation?.let {
             if (it != "Unknown") {
                 locationInput = it
+                hasUserInteracted = true
+                validationResult = CountryCodeValidator.validateAndFormat(it)
+                if (validationResult.isValid && validationResult.countryName != null) {
+                    selectedCountryName = validationResult.countryName
+                }
             }
         }
     }
-    
-    LaunchedEffect(profile) {
+      LaunchedEffect(profile) {
         // Update location input when profile changes
         profile?.let {
             if (locationInput.isEmpty()) {
                 locationInput = it.location
+                // Validate the initial location from profile
+                if (it.location.isNotEmpty()) {
+                    validationResult = CountryCodeValidator.validateAndFormat(it.location)
+                    if (validationResult.isValid && validationResult.countryName != null) {
+                        selectedCountryName = validationResult.countryName
+                    }
+                }
             }
         }
     }
@@ -240,16 +267,25 @@ fun EditProfileScreen(
             else -> {}
         }
     }
-
     fun updateProfile() {
+        hasUserInteracted = true
+        
         if (locationInput.isEmpty()) {
             coroutineScope.launch {
-                snackbarHostState.showSnackbar("Location is required")
+                snackbarHostState.showSnackbar("Country code is required")
             }
             return
         }
 
-        viewModel.updateProfile(locationInput, photoUri)
+        val validation = CountryCodeValidator.validateAndFormat(locationInput)
+        if (!validation.isValid) {
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar(validation.errorMessage ?: "Invalid country code")
+            }
+            return
+        }
+
+        viewModel.updateProfile(validation.formattedCode, photoUri)
     }
 
     // Photo picker dialog
@@ -411,16 +447,27 @@ fun EditProfileScreen(
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
-
                     OutlinedTextField(
                         value = locationInput,
-                        onValueChange = { locationInput = it },
+                        onValueChange = { newValue ->
+                            hasUserInteracted = true
+                            val filtered = CountryCodeValidator.filterInput(newValue)
+                            locationInput = filtered
+                        },
                         label = { Text("Location (country code)") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp),
-
                         singleLine = true,
-                        maxLines = 1
+                        maxLines = 1,
+                        isError = hasUserInteracted && !validationResult.isValid && locationInput.isNotEmpty(),
+                        supportingText = {
+                            if (hasUserInteracted && !validationResult.isValid && locationInput.isNotEmpty()) {
+                                Text(
+                                    text = validationResult.errorMessage ?: "Invalid country code",
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -461,13 +508,27 @@ fun EditProfileScreen(
                         }
                     }
                     Text(
-                        text = if (selectedCountryName != null) {
-                            "Selected country: $selectedCountryName ($locationInput)"
-                        } else {
-                            "Location should be a 2-letter country code \nExample: US for United States, ID for Indonesia"
+                        text = when {
+                            validationResult.isValid && validationResult.countryName != null -> {
+                                "✓ Selected country: ${validationResult.countryName} (${validationResult.formattedCode})"
+                            }
+                            hasUserInteracted && !validationResult.isValid && locationInput.isNotEmpty() -> {
+                                "Invalid country code. Please use ISO 3166-1 alpha-2 format"
+                            }
+                            selectedCountryName != null && !hasUserInteracted -> {
+                                "Selected country: $selectedCountryName ($locationInput)"
+                            }
+                            else -> {
+                                "Enter a 2-letter country code (ISO 3166-1 alpha-2)\nExamples: US, ID, GB, FR, DE, JP"
+                            }
                         },
                         fontSize = 12.sp,
-                        color = if (selectedCountryName != null) SpotifyGreen else Color.Gray,
+                        color = when {
+                            validationResult.isValid -> SpotifyGreen
+                            hasUserInteracted && !validationResult.isValid && locationInput.isNotEmpty() -> MaterialTheme.colorScheme.error
+                            selectedCountryName != null && !hasUserInteracted -> SpotifyGreen
+                            else -> Color.Gray
+                        },
                         textAlign = TextAlign.Center,
                         modifier = Modifier
                             .fillMaxWidth()
