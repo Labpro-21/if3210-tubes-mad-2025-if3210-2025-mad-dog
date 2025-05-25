@@ -95,17 +95,16 @@ fun AppNavigation(
             }
         }
     }
-    
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
+      val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: Screen.Home.route
     val isMiniPlayerActive by mainViewModel.isMiniPlayerActive.collectAsState()
-    val showMiniPlayer = (currentRoute == Screen.Home.route || currentRoute == Screen.Library.route || currentRoute == Screen.Album.route || currentRoute == Screen.Profile.route) && isMiniPlayerActive
+    val showMiniPlayer = (currentRoute == Screen.Home.route || currentRoute == Screen.Library.route || currentRoute == Screen.Album.route || currentRoute?.startsWith("album/") == true || currentRoute == Screen.Profile.route) && isMiniPlayerActive
     val isOnlinePlaying by mainViewModel.isOnlineSong.collectAsState() // Get the isOnlinePlaying state
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val showNavigationBar = when (currentRoute) {
-        Screen.Home.route, Screen.Library.route, Screen.Profile.route, Screen.SongDetail.route, Screen.SongDetailOnline.route, Screen.Album.route -> true
+    val showNavigationBar = when {
+        currentRoute == Screen.Home.route || currentRoute == Screen.Library.route || currentRoute == Screen.Profile.route || currentRoute == Screen.SongDetail.route || currentRoute == Screen.SongDetailOnline.route || currentRoute == Screen.Album.route || currentRoute?.startsWith("album/") == true -> true
         else -> false
     }
 
