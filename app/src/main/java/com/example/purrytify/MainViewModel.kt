@@ -222,7 +222,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         _isPlaying.value = false
                         _songFinished.value = true
                         _currentPosition.value = 0
-
+                        
+                        // Auto-play next song when current song finishes
+                        val currentSongId = _currentSong.value?.id
+                        if (currentSongId != null && currentSongId > 0) {
+                            Log.d(TAG, "Song finished, auto-playing next song")
+                            handleSkipNext(currentSongId)
+                        }
                     }
                 )
 
@@ -622,6 +628,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val region = _currentSong.value?.description ?: "GLOBAL"
         Log.d(TAG, "handleSkipNext called from MiniPlayer, songId: $songId, isOnline: $isOnline, region: $region")
         
+        // Reset song finished flag since we're moving to a new song
+        _songFinished.value = false
+        
         // If we have registered callbacks, use them
         if (skipToNextNavigationCallback != null) {
             skipToNextNavigationCallback?.invoke(songId, isOnline, region) { nextSongId ->
@@ -660,6 +669,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val isOnline = _isOnlineSong.value
         val region = _currentSong.value?.description ?: "GLOBAL"
         Log.d(TAG, "handleSkipPrevious called from MiniPlayer, songId: $songId, isOnline: $isOnline, region: $region")
+        
+        // Reset song finished flag since we're moving to a new song
+        _songFinished.value = false
         
         // If we have registered callbacks, use them
         if (skipToPreviousNavigationCallback != null) {

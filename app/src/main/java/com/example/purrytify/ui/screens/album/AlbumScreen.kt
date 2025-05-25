@@ -216,10 +216,11 @@ fun AlbumScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp),
+                        .padding(vertical = 8.dp, horizontal = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Download button
                     IconButton(
                         onClick = { 
                             albumViewModel.downloadSongs(
@@ -228,9 +229,7 @@ fun AlbumScreen(
                                 isDailyPlaylist = isDailyPlaylist
                             ) 
                         },
-                        modifier = Modifier
-                            .size(32.dp)
-                            .padding(start = 8.dp),
+                        modifier = Modifier.size(40.dp),
                         enabled = !isLoading && downloadProgress == null
                     ) {
                         Icon(
@@ -241,23 +240,40 @@ fun AlbumScreen(
                         )
                     }
 
-                    // Play button
+                    // Play button - improved design
                     Button(
-                        onClick = { /* Handle play action */ },
-                        modifier = Modifier
-                            .size(28.dp),
+                        onClick = { 
+                            if (songs.isNotEmpty()) {
+                                val firstSong = songs.first()
+                                
+                                mainViewModel.setIsOnlineSong(true)
+                                
+                                val route = Screen.SongDetailOnline.route
+                                    .replace("{region}", region)
+                                    .replace("{songId}", firstSong.id.toString()) +
+                                    (if (isDailyPlaylist) "?isDailyPlaylist=true" else "")
+                                
+                                navController.navigate(route)
+                            }
+                        },
+                        modifier = Modifier.size(12.dp),
                         shape = CircleShape,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF1DB954) // Spotify green
+                            containerColor = Color(0xFF1DB954), // Spotify green
+                            disabledContainerColor = Color(0xFF1DB954).copy(alpha = 0.5f)
                         ),
                         contentPadding = PaddingValues(0.dp),
-                        enabled = songs.isNotEmpty() && downloadProgress == null
+                        enabled = songs.isNotEmpty() && downloadProgress == null,
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = 6.dp,
+                            pressedElevation = 8.dp
+                        )
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.play),
                             contentDescription = "Play",
-                            tint = Color.Black,
-                            modifier = Modifier.size(14.dp)
+                            tint = Color.Black, // Changed from black to white for better contrast
+                            modifier = Modifier.size(12.dp)
                         )
                     }
                 }
@@ -417,10 +433,11 @@ fun AlbumScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = 16.dp, horizontal = 24.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Download button
                 IconButton(
                     onClick = { 
                         albumViewModel.downloadSongs(
@@ -429,36 +446,54 @@ fun AlbumScreen(
                             isDailyPlaylist = isDailyPlaylist
                         ) 
                     },
-                    modifier = Modifier
-                        .size(36.dp)
-                        .padding(start = 12.dp),
-                    enabled = !isLoading && downloadProgress == null // Disable button when loading or downloading
+                    modifier = Modifier.size(48.dp),
+                    enabled = !isLoading && downloadProgress == null
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.download),
                         contentDescription = "Download",
                         tint = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(30.dp)
                     )
                 }
-
-                // Play button
+                
+                // Play button - improved design
                 Button(
-                    onClick = { /* Handle play action */ },
-                    modifier = Modifier
-                        .size(32.dp),
+                    onClick = { 
+                        if (songs.isNotEmpty()) {
+                            // Play the first song in the album
+                            val firstSong = songs.first()
+                            
+                            // Set online song flag
+                            mainViewModel.setIsOnlineSong(true)
+                            
+                            // Navigate to the song detail screen
+                            val route = Screen.SongDetailOnline.route
+                                .replace("{region}", region)
+                                .replace("{songId}", firstSong.id.toString()) +
+                                (if (isDailyPlaylist) "?isDailyPlaylist=true" else "")
+                            
+                            navController.navigate(route)
+                        }
+                    },
+                    modifier = Modifier.size(32.dp),
                     shape = CircleShape,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF1DB954) // Spotify green
+                        containerColor = Color(0xFF1DB954), // Spotify green
+                        disabledContainerColor = Color(0xFF1DB954).copy(alpha = 0.5f)
                     ),
                     contentPadding = PaddingValues(0.dp),
-                    enabled = songs.isNotEmpty() && downloadProgress == null // Enable only when songs are loaded and not downloading
+                    enabled = songs.isNotEmpty() && downloadProgress == null,
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 6.dp,
+                        pressedElevation = 8.dp
+                    )
                 ) {
                     Icon(
-                        painter = painterResource(id = R.drawable.play), // Replace with actual play icon
+                        painter = painterResource(id = R.drawable.play),
                         contentDescription = "Play",
-                        tint = Color.Black,
-                        modifier = Modifier.size(16.dp)
+                        tint = Color.Black, // Changed from black to white for better contrast
+                        modifier = Modifier.size(14.dp)
                     )
                 }
             }
