@@ -16,6 +16,9 @@ Purrytify adalah aplikasi Android yang dibangun sebagai klon dari Spotify, menaw
 - **Location Features**: Map integration for music discovery
 - **Social Features**: QR code sharing and social connectivity
 - **Statistics**: Track your listening habits and preferences
+- **Sound Capsule**: Manage and organize your music collections
+- **Online Songs**: Stream and download music from online sources
+- **Audio Routing**: Control output devices and audio settings
 
 ## Screenshots
 
@@ -25,11 +28,17 @@ Purrytify adalah aplikasi Android yang dibangun sebagai klon dari Spotify, menaw
 |-------------|--------------|----------|
 | ![Home Screen](screenshots/milestone2/home1.jpg) | ![Library](screenshots/milestone2/library.jpg) | ![Profile](screenshots/milestone2/profile1.jpg) |
 
-### Music Experience
+### Album Experience
 
-| Album View | Song Details | Audio Controls |
-|------------|--------------|----------------|
-| ![Album](screenshots/milestone2/album3.jpg) | ![Song Detail](screenshots/milestone2/online_song_detail1.jpg) | ![Audio](screenshots/milestone2/audio_routing.jpg) |
+| Album View 1 | Album View 2 | Album View 3 |
+|-------------|--------------|--------------|
+| ![Album 1](screenshots/milestone2/album1.jpg) | ![Album 2](screenshots/milestone2/album2.jpg) | ![Album 3](screenshots/milestone2/album3.jpg) |
+
+### Music Controls & Details
+
+| Song Details | Audio Controls | Home Experience |
+|--------------|----------------|-----------------|
+| ![Song Detail](screenshots/milestone2/online_song_detail1.jpg) | ![Audio](screenshots/milestone2/audio_routing.jpg) | ![Home 2](screenshots/milestone2/home2.jpg) |
 
 ### User Features
 
