@@ -7,7 +7,7 @@
 
 ---
 
-Purrytify adalah aplikasi Android yang dibangun sebagai klon dari Spotify, menawarkan fitur-fitur inti seperti login pengguna, kemampuan untuk mengunggah dan mengelola lagu lokal, pemutar media yang lengkap dengan kontrol playback dan antrian, mini player untuk kontrol persisten, layar detail lagu, navigasi skip, fungsionalitas favorit dan riwayat putar, serta antarmuka pengguna modern dan responsif yang terinspirasi oleh desain Spotify dan dibangun dengan Jetpack Compose, termasuk pemutaran latar belakang untuk pengalaman mendengarkan yang mulus.
+Purrytify adalah aplikasi Android yang dibangun sebagai musik player dengan fitur-fitur seperti login pengguna, kemampuan untuk mengelola lagu lokal, pemutar media dengan kontrol playback, mini player untuk kontrol persisten, navigasi antar lagu, fungsionalitas favorit dan riwayat putar, serta antarmuka pengguna modern yang terinspirasi oleh desain Spotify dan dibangun dengan Jetpack Compose.
 
 ## ✨ Features
 
@@ -16,33 +16,32 @@ Purrytify adalah aplikasi Android yang dibangun sebagai klon dari Spotify, menaw
     <td width="50%">
       
 ### 🔐 **Authentication & User Management**
-- 🏠 **User Authentication**: Secure login and user profile management
-- 👤 **Profile Management**: Customize your personal music profile
+- 🏠 **User Login**: Basic user authentication system
+- 👤 **Profile Management**: View and edit user profile
 
 ### 🎵 **Music Experience**
-- 📱 **Local Music Management**: Upload and manage your local music library
-- ▶️ **Media Playbook**: Full-featured media player with playback controls and queue management
-- 🎛️ **Mini Player**: Persistent playback controls while navigating the app
-- 📄 **Song Details**: Detailed view for songs with metadata and controls
-- ❤️ **Favorites**: Mark and manage your favorite songs
-- 📈 **Play History**: Track your listening history
-- 🔄 **Background Playback**: Continue listening while using other apps
+- 📱 **Local Music Management**: Browse and manage local music files
+- ▶️ **Media Player**: Basic media player with playback controls
+- 🎛️ **Mini Player**: Compact player controls for navigation
+- 📄 **Song Details**: Display song information and metadata
+- ❤️ **Favorites**: Mark songs as favorites
+- 📈 **Play History**: Track listening history
 
     </td>
     <td width="50%">
       
-### 🌐 **Advanced Features**
-- 📱 **Responsive Design**: Modern UI that adapts to different screen orientations
-- 🗺️ **Location Features**: Map integration for music discovery
-- 🤝 **Social Features**: QR code sharing and social connectivity
-- 📊 **Statistics**: Track your listening habits and preferences
-- 💊 **Sound Capsule**: Manage and organize your music collections
-- 🌍 **Online Songs**: Stream and download music from online sources
-- 🎧 **Audio Routing**: Control output devices and audio settings
+### 🌐 **Additional Features**
+- 📱 **Responsive Design**: UI that adapts to different screen sizes
+- 🗺️ **Location Integration**: Basic map functionality
+- 🤝 **Social Features**: QR code sharing capabilities
+- 📊 **Statistics**: Basic listening statistics and charts
+- 💊 **Sound Capsule**: Music collection management
+- 🌍 **Online Integration**: Basic online music features
+- 🎧 **Audio Controls**: Audio output management
 
-### 🔔 **Smart Features**
-- 📬 **Notifications**: Stay updated with your music activity
-- 🎯 **Recommendations**: Discover new music based on your preferences
+### 🔔 **Other Features**
+- 📬 **Notifications**: Basic notification system
+- 🎯 **Recommendations**: Simple music recommendation features
 
     </td>
   </tr>
@@ -177,15 +176,16 @@ Purrytify adalah aplikasi Android yang dibangun sebagai klon dari Spotify, menaw
         <li>🎭 Material Design 3</li>
         <li>⚡ Android Core KTX</li>
         <li>🔄 Android Lifecycle Components</li>
-        <li>🧭 Navigation Component</li>
+        <li>🧭 Navigation Compose</li>
         <li>💫 SplashScreen API</li>
+        <li>🎯 Material Icons Extended</li>
       </ul>
     </td>
     <td align="center" width="33%">
       <h3>💾 Data Management</h3>
       <ul align="left">
-        <li>🏪 Room Persistence Library</li>
-        <li>📦 DataStore</li>
+        <li>🏪 Room Database</li>
+        <li>📦 DataStore Preferences</li>
         <li>🔐 Security-Crypto</li>
         <li>⚙️ WorkManager</li>
       </ul>
@@ -193,16 +193,17 @@ Purrytify adalah aplikasi Android yang dibangun sebagai klon dari Spotify, menaw
     <td align="center" width="34%">
       <h3>🎵 Media & Graphics</h3>
       <ul align="left">
-        <li>🎧 ExoPlayer (Media Playback)</li>
-        <li>🖼️ Coil (Image Loading)</li>
+        <li>🎧 Android Media API</li>
+        <li>🖼️ Coil Compose (Image Loading)</li>
         <li>🎨 Palette KTX (Color Extraction)</li>
+        <li>📊 Vico Charts</li>
       </ul>
     </td>
   </tr>
   <tr>
     <td align="center" colspan="3">
-      <h3>🌐 Networking & API</h3>
-      <p>🔗 Retrofit • 🌍 OkHttp • 📄 Gson Converter • ⚡ Kotlin Coroutines</p>
+      <h3>🌐 Networking & Location</h3>
+      <p>🔗 Retrofit • 🌍 OkHttp • 📄 Gson Converter • ⚡ Kotlin Coroutines • 🗺️ Google Maps • 📍 Google Places • 📱 QR Code (ZXing)</p>
     </td>
   </tr>
 </table>
@@ -236,7 +237,6 @@ Purrytify adalah aplikasi Android yang dibangun sebagai klon dari Spotify, menaw
     <td align="center" width="34%">
       <h3>🎯 Domain Layer</h3>
       <ul align="left">
-        <li>⚡ Use Cases</li>
         <li>🧠 Business Logic</li>
         <li>📝 Models</li>
         <li>🎵 Media Player Service</li>
