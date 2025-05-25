@@ -26,6 +26,9 @@ interface SongsDao {
     @Query("SELECT * FROM songs WHERE userId = :userId")
     fun getAllSongsForUser(userId: Int): Flow<List<Songs>>
 
+    @Query("SELECT * FROM songs WHERE userId = :userId")
+    suspend fun getAllSongsForUserSync(userId: Int): List<Songs>
+
     @Query("SELECT * FROM songs")
     fun getAllSongs(): Flow<List<Songs>>
 

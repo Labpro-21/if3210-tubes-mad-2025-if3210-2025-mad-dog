@@ -132,7 +132,7 @@ fun SoundCapsuleCard(
                         modifier = Modifier
                             .weight(1f)
                             .clickable { onTopArtistClick() },
-                        backgroundColor = Color(0xFF212121),
+                        backgroundColor = Color(0xFF141414),
                         textColor = Color.White
                     )
 
@@ -145,7 +145,7 @@ fun SoundCapsuleCard(
                         modifier = Modifier
                             .weight(1f)
                             .clickable { onTopSongClick() },
-                        backgroundColor = Color(0xFF212121),
+                        backgroundColor = Color(0xFF141414),
                         textColor = Color.White
                     )
                 }
@@ -156,7 +156,7 @@ fun SoundCapsuleCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFF212121)
+                        containerColor = Color(0xFF141414)
                     )
                 ) {
                     Column(

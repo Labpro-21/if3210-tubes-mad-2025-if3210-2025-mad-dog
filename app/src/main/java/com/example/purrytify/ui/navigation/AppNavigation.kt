@@ -68,6 +68,30 @@ fun AppNavigation(
     val navController = rememberNavController()
     val context = LocalContext.current
     
+    // Create a global SongDetailViewModel for navigation
+    val globalSongDetailViewModel: SongDetailViewModel = viewModel(
+        factory = SongDetailViewModel.Factory(
+            application = context.applicationContext as Application,
+            mainViewModel = mainViewModel
+        )
+    )
+    
+    // Register navigation callbacks at the top level
+    LaunchedEffect(Unit) {
+        mainViewModel.registerNavigationCallbacks(
+            skipToNext = { currentSongId, isOnline, currentRegion, onNavigate ->
+                globalSongDetailViewModel.skipNext(
+                    currentSongId = currentSongId,
+                    isOnline = isOnline,
+                    currentRegion = currentRegion,
+                    onNavigate = onNavigate,
+                    isDailyPlaylist = false
+                )
+            },
+            skipToPrevious = globalSongDetailViewModel::skipPrevious
+        )
+    }
+    
     // Handle deep links after login
     LaunchedEffect(Unit) {
         val sharedPref = context.getSharedPreferences("DeepLinkPrefs", Context.MODE_PRIVATE)
@@ -299,28 +323,6 @@ fun AppNavigation(
                         mainViewModel = mainViewModel,
                         isOnline = false
                     )
-                    
-                    val songDetailViewModel = viewModel<SongDetailViewModel>(
-                        factory = SongDetailViewModel.Factory(
-                            application = LocalContext.current.applicationContext as Application,
-                            mainViewModel = mainViewModel
-                        )
-                    )
-                    
-                    LaunchedEffect(Unit) {
-                        mainViewModel.registerNavigationCallbacks(
-                            skipToNext = { currentSongId, isOnline, currentRegion, onNavigate ->
-                                songDetailViewModel.skipNext(
-                                    currentSongId = currentSongId,
-                                    isOnline = isOnline,
-                                    currentRegion = currentRegion,
-                                    onNavigate = onNavigate,
-                                    isDailyPlaylist = false
-                                )
-                            },
-                            skipToPrevious = songDetailViewModel::skipPrevious
-                        )
-                    }
                 }
                 composable(
                     Screen.SongDetailOnline.route,
@@ -343,26 +345,6 @@ fun AppNavigation(
                         isOnline = true,
                         region = region
                     )
-                    val songDetailViewModel = viewModel<SongDetailViewModel>(
-                        factory = SongDetailViewModel.Factory(
-                            application = LocalContext.current.applicationContext as Application,
-                            mainViewModel = mainViewModel
-                        )
-                    )
-                    LaunchedEffect(Unit) {
-                        mainViewModel.registerNavigationCallbacks(
-                            skipToNext = { currentSongId, isOnline, currentRegion, onNavigate ->
-                                songDetailViewModel.skipNext(
-                                    currentSongId = currentSongId,
-                                    isOnline = isOnline,
-                                    currentRegion = currentRegion,
-                                    onNavigate = onNavigate,
-                                    isDailyPlaylist = false
-                                )
-                            },
-                            skipToPrevious = songDetailViewModel::skipPrevious
-                        )
-                    }
                 }
 
                 composable(

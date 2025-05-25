@@ -27,6 +27,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import com.example.purrytify.data.model.OnlineSongResponse
+import java.util.*
+import com.example.purrytify.ui.screens.songdetail.SongDetailViewModel
+import com.example.purrytify.utils.MediaUtils
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -73,6 +76,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Navigation callbacks for media controller
     private var skipToNextNavigationCallback: ((Int, Boolean, String, (Int) -> Unit) -> Unit)? = null
     private var skipToPreviousNavigationCallback: ((Int, Boolean, String, (Int) -> Unit) -> Unit)? = null
+
+    // Keep a global instance of SongDetailViewModel to handle navigation
+    private var globalSongDetailViewModel: SongDetailViewModel? = null
 
     // Add state to store online song sequences by region
     private val _onlineSongSequences = MutableStateFlow<Map<String, List<Int>>>(emptyMap())
@@ -192,6 +198,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         checkLoginStatus()
         observeAuthState()
         bindMediaService()
+        
+        // Initialize global SongDetailViewModel for navigation across screens
+        getGlobalSongDetailViewModel()
     }
     private fun bindMediaService() {
         val context = getApplication<Application>().applicationContext
@@ -241,113 +250,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun findSongById(songId: Int): Songs? {
-        Log.d(TAG, "Finding song with ID: $songId, isOnlineSong: ${_isOnlineSong.value}")
-        
-        // First try to find in local database
-        val db = AppDatabase.getDatabase(getApplication())
-        val localSong = db.songsDao().getSongById(songId)
-        
-        if (localSong != null) {
-            Log.d(TAG, "Found song in local database: ${localSong.name}")
-            return localSong
+        val isOnline = _isOnlineSong.value
+        return if (isOnline) {
+            // Try to get online song from API
+            val region = _currentSong.value?.description ?: "GLOBAL"
+            val repository = OnlineSongRepository.getInstance(getApplication())
+            val onlineSong = repository.getSongById(songId)
+            if (onlineSong != null) {
+                Songs(
+                    id = onlineSong.id,
+                    name = onlineSong.title,
+                    artist = onlineSong.artist,
+                    artwork = onlineSong.artwork,
+                    description = region,
+                    filePath = onlineSong.url,
+                    duration = MediaUtils.parseDuration(onlineSong.duration),
+                    isFavorite = false,
+                    userId = authRepository.currentUserId ?: 0,
+                    uploadDate = Date()
+                )
+            } else null
+        } else {
+            // Get local song from database
+            val songDao = AppDatabase.getDatabase(getApplication()).songsDao()
+            songDao.getSongById(songId)
         }
-        
-        // If song not found locally and we're in online mode, try to fetch from network
-        if (_isOnlineSong.value) {
-            Log.d(TAG, "Song not found locally, searching online")
-            val onlineSongRepository = OnlineSongRepository.getInstance(getApplication())
-            
-            // Try to determine the region from the current song
-            val currentSong = mediaController?.currentSong?.value
-            var region = "GLOBAL" // Default region
-            
-            if (currentSong != null && currentSong.description.isNotEmpty()) {
-                // If the current song has a region specified in its description, use that
-                region = currentSong.description
-                Log.d(TAG, "Using region from current song: $region")
-            }
-            
-            // First try to fetch songs from the specific region
-            var onlineSongs = if (region != "GLOBAL") {
-                onlineSongRepository.getTopCountrySongs(region)
-            } else {
-                onlineSongRepository.getTopGlobalSongs()
-            }
-            
-            // If no songs found in specific region, fall back to global
-            if (onlineSongs.isNullOrEmpty() && region != "GLOBAL") {
-                Log.d(TAG, "No songs found in region $region, falling back to global")
-                onlineSongs = onlineSongRepository.getTopGlobalSongs()
-            }
-            
-            if (onlineSongs != null) {
-                // Find the specific song in the fetched list
-                val onlineSong = onlineSongs.find { it.id == songId }
-                if (onlineSong != null) {
-                    Log.d(TAG, "Found song online: ${onlineSong.title} in region: ${onlineSong.country ?: "GLOBAL"}")
-                    
-                    // Convert online song to Songs entity
-                    return Songs(
-                        id = onlineSong.id,
-                        name = onlineSong.title,
-                        artist = onlineSong.artist,
-                        description = onlineSong.country ?: "",
-                        filePath = onlineSong.url,
-                        artwork = onlineSong.artwork,
-                        duration = com.example.purrytify.utils.MediaUtils.parseDuration(onlineSong.duration),
-                        isFavorite = false,
-                        userId = authRepository.currentUserId ?: 0,
-                        uploadDate = java.util.Date()
-                    )
-                }
-            }
-            
-            // If the song was not found in the current region, try all other regions
-            Log.d(TAG, "Song not found in region $region, checking all regions")
-            val allRegions = listOf("GLOBAL", "ID", "US", "KR", "JP") // Add all supported regions
-            for (otherRegion in allRegions) {
-                if (otherRegion == region) continue // Skip region we already checked
-                
-                Log.d(TAG, "Checking region: $otherRegion")
-                val regionSongs = if (otherRegion == "GLOBAL") {
-                    onlineSongRepository.getTopGlobalSongs()
-                } else {
-                    onlineSongRepository.getTopCountrySongs(otherRegion)
-                }
-                
-                if (regionSongs != null) {
-                    val regionSong = regionSongs.find { it.id == songId }
-                    if (regionSong != null) {
-                        Log.d(TAG, "Found song online: ${regionSong.title} in region: ${regionSong.country ?: "GLOBAL"}")
-                        
-                        // Convert online song to Songs entity
-                        return Songs(
-                            id = regionSong.id,
-                            name = regionSong.title,
-                            artist = regionSong.artist,
-                            description = regionSong.country ?: "",
-                            filePath = regionSong.url,
-                            artwork = regionSong.artwork,
-                            duration = com.example.purrytify.utils.MediaUtils.parseDuration(regionSong.duration),
-                            isFavorite = false,
-                            userId = authRepository.currentUserId ?: 0,
-                            uploadDate = java.util.Date()
-                        )
-                    }
-                }
-            }
-        }
-        
-        if (mediaController?.playlist?.value?.isNotEmpty() == true) {
-            val playlistSong = mediaController?.playlist?.value?.find { it.id == songId }
-            if (playlistSong != null) {
-                Log.d(TAG, "Found song in current playlist: ${playlistSong.name}")
-                return playlistSong
-            }
-        }
-        
-        Log.w(TAG, "Song with ID $songId not found in any source")
-        return null
     }
 
     private fun observeMediaControllerStates() {
@@ -597,27 +524,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
 
     private fun skipNext(songId: Int) {
-        if (skipToNextNavigationCallback != null) {
-            val isOnline = _isOnlineSong.value
-            val region = "GLOBAL"
-            skipToNextNavigationCallback?.invoke(songId, isOnline, region) { nextSongId ->
-                Log.d(TAG, "Would navigate to next song: $nextSongId")
-            }
-        } else {
-            Log.d(TAG, "Skip to next requested but no navigation callback is registered")
-        }
+        Log.d(TAG, "skipNext called from MediaController with songId: $songId")
+        handleSkipNext(songId)
     }
 
     private fun skipPrevious(songId: Int) {
-        if (skipToPreviousNavigationCallback != null) {
-            val isOnline = _isOnlineSong.value
-            val region = "GLOBAL"
-            skipToPreviousNavigationCallback?.invoke(songId, isOnline, region) { prevSongId ->
-                Log.d(TAG, "Would navigate to previous song: $prevSongId")
-            }
-        } else {
-            Log.d(TAG, "Skip to previous requested but no navigation callback is registered")
-        }
+        Log.d(TAG, "skipPrevious called from MediaController with songId: $songId")
+        handleSkipPrevious(songId)
     }
 
     fun playDailyPlaylist(userId: Int, startIndex: Int = 0) {
@@ -690,5 +603,92 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Caching
     fun getOnlineSongSequence(region: String): List<Int> {
         return _onlineSongSequences.value[region] ?: emptyList()
+    }
+
+    // Get or create the global SongDetailViewModel
+    private fun getGlobalSongDetailViewModel(): SongDetailViewModel {
+        if (globalSongDetailViewModel == null) {
+            globalSongDetailViewModel = SongDetailViewModel(
+                getApplication(),
+                this
+            )
+        }
+        return globalSongDetailViewModel!!
+    }
+
+    // Public method to handle next button from MiniPlayer
+    fun handleSkipNext(songId: Int) {
+        val isOnline = _isOnlineSong.value
+        val region = _currentSong.value?.description ?: "GLOBAL"
+        Log.d(TAG, "handleSkipNext called from MiniPlayer, songId: $songId, isOnline: $isOnline, region: $region")
+        
+        // If we have registered callbacks, use them
+        if (skipToNextNavigationCallback != null) {
+            skipToNextNavigationCallback?.invoke(songId, isOnline, region) { nextSongId ->
+                Log.d(TAG, "Next song ID from callback: $nextSongId")
+                viewModelScope.launch {
+                    val nextSong = findSongById(nextSongId)
+                    if (nextSong != null) {
+                        playSong(nextSong)
+                    }
+                }
+            }
+            return
+        }
+        
+        // Fallback to global SongDetailViewModel if no callback is registered
+        val songDetailViewModel = getGlobalSongDetailViewModel()
+        songDetailViewModel.skipNext(
+            currentSongId = songId,
+            isOnline = isOnline,
+            currentRegion = region,
+            onNavigate = { nextSongId ->
+                Log.d(TAG, "Next song ID from global ViewModel: $nextSongId")
+                viewModelScope.launch {
+                    val nextSong = findSongById(nextSongId)
+                    if (nextSong != null) {
+                        playSong(nextSong)
+                    }
+                }
+            },
+            isDailyPlaylist = _currentSongSource.value == "daily"
+        )
+    }
+
+    // Public method to handle previous button from MiniPlayer
+    fun handleSkipPrevious(songId: Int) {
+        val isOnline = _isOnlineSong.value
+        val region = _currentSong.value?.description ?: "GLOBAL"
+        Log.d(TAG, "handleSkipPrevious called from MiniPlayer, songId: $songId, isOnline: $isOnline, region: $region")
+        
+        // If we have registered callbacks, use them
+        if (skipToPreviousNavigationCallback != null) {
+            skipToPreviousNavigationCallback?.invoke(songId, isOnline, region) { prevSongId ->
+                Log.d(TAG, "Previous song ID from callback: $prevSongId")
+                viewModelScope.launch {
+                    val prevSong = findSongById(prevSongId)
+                    if (prevSong != null) {
+                        playSong(prevSong)
+                    }
+                }
+            }
+            return
+        }
+        
+        // Fallback to global SongDetailViewModel if no callback is registered
+        val songDetailViewModel = getGlobalSongDetailViewModel()
+        songDetailViewModel.skipPrevious(
+            currentSongId = songId,
+            isOnline = isOnline,
+            currentRegion = region
+        ) { prevSongId ->
+            Log.d(TAG, "Previous song ID from global ViewModel: $prevSongId")
+            viewModelScope.launch {
+                val prevSong = findSongById(prevSongId)
+                if (prevSong != null) {
+                    playSong(prevSong)
+                }
+            }
+        }
     }
 }

@@ -5,22 +5,29 @@ import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -34,7 +41,6 @@ import com.example.purrytify.MainViewModel
 import com.example.purrytify.db.entity.Songs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import androidx.compose.material3.ExperimentalMaterial3Api
 import kotlinx.coroutines.withContext
 import androidx.palette.graphics.Palette
 import coil.imageLoader
@@ -56,6 +62,7 @@ fun MiniPlayer(mainViewModel: MainViewModel, onMiniPlayerClick: () -> Unit, modi
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val isOnlinePlaying by mainViewModel.isOnlineSong.collectAsState()
+    val context = LocalContext.current
 
     // Function to ensure color isn't too bright and maintains good contrast
     fun adjustColorBrightness(color: Color): Color {
@@ -82,7 +89,6 @@ fun MiniPlayer(mainViewModel: MainViewModel, onMiniPlayerClick: () -> Unit, modi
 
     currentSong?.let { song ->
         val artworkUri = song.artwork?.let { Uri.parse(it) }
-        val context = LocalContext.current
         val painter = rememberAsyncImagePainter(
             ImageRequest.Builder(context).data(data = artworkUri).apply {
                 crossfade(true)
@@ -117,10 +123,13 @@ fun MiniPlayer(mainViewModel: MainViewModel, onMiniPlayerClick: () -> Unit, modi
             }
         }
 
+        // Determine optimal height for player
+        val playerHeight = if (isLandscape) 70.dp else 95.dp
+
         Box(
             modifier = modifier
                 .fillMaxWidth()
-                .height(if (isLandscape) 64.dp else 80.dp)
+                .height(playerHeight)
                 .clip(RoundedCornerShape(16.dp))
                 .background(
                     Brush.horizontalGradient(
@@ -146,36 +155,46 @@ fun MiniPlayer(mainViewModel: MainViewModel, onMiniPlayerClick: () -> Unit, modi
                     )
             )
 
-            Row(
+            // Unified 2-Row layout for all songs
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
-                Image(
-                    painter = painter,
-                    contentDescription = "Artist Artwork",
+                // Row 1: Artwork, song info, and controls
+                Row(
                     modifier = Modifier
-                        .size(if (isLandscape) 40.dp else 56.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
-                )
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = song.name,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        fontSize = if (isLandscape) 14.sp else 16.sp
+                    // Artwork
+                    Image(
+                        painter = painter,
+                        contentDescription = "Artist Artwork",
+                        modifier = Modifier
+                            .size(if (isLandscape) 45.dp else 52.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop
                     )
-                    if (!isLandscape) {
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
+                    
+                    // Song info
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp)
+                    ) {
+                        Text(
+                            text = song.name,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = if (isLandscape) 14.sp else 16.sp
+                        )
+                        
                         Text(
                             text = song.artist,
                             color = Color.White.copy(alpha = 0.7f),
@@ -184,83 +203,152 @@ fun MiniPlayer(mainViewModel: MainViewModel, onMiniPlayerClick: () -> Unit, modi
                             fontSize = 12.sp
                         )
                     }
-                    Slider(
-                        value = sliderPosition,
-                        onValueChange = {
-                            val newPosition = (it * song.duration.toInt()).toInt()
-                            mainViewModel.seekTo(newPosition)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(16.dp),
-                        valueRange = 0f..1f,
-                        thumb = {},
-                        track = {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(2.dp)
-                                    .background(Color.White.copy(alpha = 0.3f), RoundedCornerShape(1.dp))
+                    
+                    // Controls row
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 2.dp else 4.dp)
+                    ) {
+                        // Control sizes
+                        val controlSize = if (isLandscape) 32.dp else 36.dp
+                        val playPauseSize = if (isLandscape) 36.dp else 40.dp
+                        val iconSize = if (isLandscape) 18.dp else 20.dp
+                        
+                        // Previous button
+                        IconButton(
+                            onClick = { 
+                                if (song.id > 0) {
+                                    mainViewModel.handleSkipPrevious(song.id)
+                                }
+                            },
+                            modifier = Modifier.size(controlSize)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.SkipPrevious,
+                                contentDescription = "Previous",
+                                tint = Color.White,
+                                modifier = Modifier.size(iconSize)
+                            )
+                        }
+                        
+                        // Play/Pause button
+                        IconButton(
+                            onClick = { mainViewModel.playSong(song) },
+                            modifier = Modifier
+                                .size(playPauseSize)
+                                .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(playPauseSize/2))
+                        ) {
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                contentDescription = "Play/Pause",
+                                tint = Color.White,
+                                modifier = Modifier.size(if (isLandscape) 20.dp else 24.dp)
+                            )
+                        }
+                        
+                        // Next button
+                        IconButton(
+                            onClick = { 
+                                if (song.id > 0) {
+                                    mainViewModel.handleSkipNext(song.id)
+                                }
+                            },
+                            modifier = Modifier.size(controlSize)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.SkipNext,
+                                contentDescription = "Next",
+                                tint = Color.White,
+                                modifier = Modifier.size(iconSize)
+                            )
+                        }
+                        
+                        // Show share and QR buttons only for online songs
+                        if (isOnlinePlaying && song.id > 0) {
+                            // Share button
+                            IconButton(
+                                onClick = {
+                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_TEXT, "https://puritify-deeplink.vercel.app/song/${song.id}")
+                                    }
+                                    context.startActivity(Intent.createChooser(shareIntent, null))
+                                },
+                                modifier = Modifier.size(controlSize)
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth(sliderPosition)
-                                        .height(2.dp)
-                                        .background(Color.White, RoundedCornerShape(1.dp))
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_share),
+                                    contentDescription = "Share Song",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(iconSize)
+                                )
+                            }
+                            
+                            // QR button
+                            IconButton(
+                                onClick = {
+                                    val qrIntent = Intent(context, QrCodeActivity::class.java).apply {
+                                        putExtra("DEEP_LINK", "https://puritify-deeplink.vercel.app/song/${song.id}")
+                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    }
+                                    context.startActivity(qrIntent)
+                                },
+                                modifier = Modifier.size(controlSize)
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_qr_code),
+                                    contentDescription = "QR Code",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(iconSize)
                                 )
                             }
                         }
-                    )
-                }
-
-                IconButton(
-                    onClick = { mainViewModel.playSong(song) },
-                    modifier = Modifier
-                        .size(if (isLandscape) 40.dp else 48.dp)
-                        .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(24.dp))
-                ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = "Play/Pause",
-                        tint = Color.White,
-                        modifier = Modifier.size(if (isLandscape) 24.dp else 28.dp)
-                    )
-                }
-
-                if (isOnlinePlaying && song.id > 0) {
-                    Row {
-                        IconButton(
-                            onClick = {
-                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(Intent.EXTRA_TEXT, "https://puritify-deeplink.vercel.app/song/${song.id}")
-                                }
-                                context.startActivity(Intent.createChooser(shareIntent, null))
-                            }
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_share),
-                                contentDescription = "Share Song",
-                                tint = Color.White
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        IconButton(
-                            onClick = {
-                                val qrIntent = Intent(context, QrCodeActivity::class.java).apply {
-                                    putExtra("DEEP_LINK", "https://puritify-deeplink.vercel.app/song/${song.id}")
-                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                }
-                                context.startActivity(qrIntent)
-                            }
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_qr_code),
-                                contentDescription = "Share QR Code",
-                                tint = Color.White
-                            )
-                        }
                     }
+                }
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                // Row 2: Spotify-style progress bar (simple thin line without thumb)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(16.dp)
+                        .padding(horizontal = 4.dp)
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onPress = { offset ->
+                                    // Calculate position based on touch
+                                    val seekRatio = (offset.x / size.width).coerceIn(0f, 1f)
+                                    val newPosition = (seekRatio * song.duration.toInt()).toInt()
+                                    mainViewModel.seekTo(newPosition)
+                                },
+                                onTap = { offset ->
+                                    // Calculate position based on touch
+                                    val seekRatio = (offset.x / size.width).coerceIn(0f, 1f)
+                                    val newPosition = (seekRatio * song.duration.toInt()).toInt()
+                                    mainViewModel.seekTo(newPosition)
+                                }
+                            )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Simple thin line progress bar - just a background track and a progress overlay
+                    // Background track (grey)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.5.dp)  // Very thin line
+                            .background(Color.White.copy(alpha = 0.3f))
+                    )
+                    
+                    // Progress track (white)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(sliderPosition.coerceIn(0f, 1f))
+                            .height(1.5.dp)  // Same height as background
+                            .background(Color.White)
+                            .align(Alignment.CenterStart)  // Align to start to fill from left to right
+                    )
                 }
             }
         }

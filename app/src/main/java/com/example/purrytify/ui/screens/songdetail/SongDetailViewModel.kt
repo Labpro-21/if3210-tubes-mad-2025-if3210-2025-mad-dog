@@ -122,16 +122,48 @@ class SongDetailViewModel(
         Log.d(tag, "Loading user song IDs")
         viewModelScope.launch {
             authRepository.currentUserId?.let { userId ->
-                songDao.getAllSongsForUser(userId).collect { songsList ->
-                    _userSongIds.value = songsList.map { it.id }
-                    Log.d(tag, "Loaded ${songsList.size} songs for user $userId")
-                    _currentOnlineSongId.value?.let { 
-                        checkIfAlreadyDownloaded(it)
-                        Log.d(tag, "Checked download status for song $it")
+                try {
+                    // First try to get all songs immediately for navigation
+                    val allSongs = songDao.getAllSongsForUserSync(userId)
+                    if (allSongs.isNotEmpty()) {
+                        _userSongIds.value = allSongs.map { it.id }
+                        Log.d(tag, "Immediately loaded ${allSongs.size} songs for user $userId")
                     }
+                    
+                    // Then set up the Flow collection for updates
+                    songDao.getAllSongsForUser(userId).collect { songsList ->
+                        _userSongIds.value = songsList.map { it.id }
+                        Log.d(tag, "Updated song list: ${songsList.size} songs for user $userId")
+                        _currentOnlineSongId.value?.let { 
+                            checkIfAlreadyDownloaded(it)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(tag, "Error loading user songs: ${e.message}", e)
                 }
             } ?: Log.e(tag, "Cannot load user song IDs - User ID is null")
         }
+    }
+
+    private suspend fun ensureUserSongsLoaded(): Boolean {
+        if (_userSongIds.value.isEmpty()) {
+            Log.d(tag, "User songs not loaded yet, loading now")
+            authRepository.currentUserId?.let { userId ->
+                try {
+                    val allSongs = songDao.getAllSongsForUserSync(userId)
+                    _userSongIds.value = allSongs.map { it.id }
+                    Log.d(tag, "Loaded ${allSongs.size} songs for user $userId")
+                    return allSongs.isNotEmpty()
+                } catch (e: Exception) {
+                    Log.e(tag, "Error loading user songs: ${e.message}", e)
+                    return false
+                }
+            } ?: run {
+                Log.e(tag, "Cannot load user songs - User ID is null")
+                return false
+            }
+        }
+        return true
     }
 
     private fun checkIfAlreadyDownloaded(songId: Int) {
@@ -336,7 +368,11 @@ class SongDetailViewModel(
         viewModelScope.launch {
             if (!isOnline) {
                 Log.d(tag, "Handling local skip next")
-                handleLocalSkipNext(currentSongId, onNavigate)
+                if (ensureUserSongsLoaded()) {
+                    handleLocalSkipNext(currentSongId, onNavigate)
+                } else {
+                    Log.e(tag, "Failed to load user songs for navigation")
+                }
                 return@launch
             }
 
@@ -412,7 +448,11 @@ class SongDetailViewModel(
     fun skipPrevious(currentSongId: Int, isOnline: Boolean, currentRegion: String = "GLOBAL", onNavigate: (Int) -> Unit) {
         viewModelScope.launch {
             if (!isOnline) {
-                handleLocalSkipPrevious(currentSongId, onNavigate)
+                if (ensureUserSongsLoaded()) {
+                    handleLocalSkipPrevious(currentSongId, onNavigate)
+                } else {
+                    Log.e(tag, "Failed to load user songs for navigation")
+                }
                 return@launch
             }
 
