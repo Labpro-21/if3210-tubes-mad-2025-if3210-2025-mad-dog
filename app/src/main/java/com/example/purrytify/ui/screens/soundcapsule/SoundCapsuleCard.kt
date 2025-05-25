@@ -1,5 +1,6 @@
 package com.example.purrytify.ui.screens.soundcapsule
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,11 +35,14 @@ import com.example.purrytify.R
 import com.example.purrytify.ui.screens.profile.ProfileViewModel.SoundCapsuleViewModel
 import java.util.concurrent.TimeUnit
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 
 @Composable
 fun SoundCapsuleCard(
@@ -46,13 +50,14 @@ fun SoundCapsuleCard(
     onTimeListenedClick: () -> Unit = {},
     onTopSongClick: () -> Unit = {},
     onTopArtistClick: () -> Unit = {},
-    onDownloadClick: () -> Unit = {}
+    onDownloadClick: () -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF282828))
+            .padding(vertical = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0A0A))
     ) {
         Column(
             modifier = Modifier
@@ -90,7 +95,7 @@ fun SoundCapsuleCard(
                     color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 20.sp,
                     modifier = Modifier.fillMaxWidth(),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -101,7 +106,7 @@ fun SoundCapsuleCard(
                         .clickable { onTimeListenedClick() },
                     shape = RoundedCornerShape(8.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFF212121)
+                        containerColor = Color(0xFF141414)
                     )
                 ) {
                     DetailRow(
@@ -146,95 +151,112 @@ fun SoundCapsuleCard(
                 }
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Row 3: Listening Streak Card (Full Width)
+                // Row 3: Listening Streak Card (Full Width) with Streak Song inside
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFF212121) // Warna abu-abu gelap
+                        containerColor = Color(0xFF212121)
                     )
                 ) {
-                    DetailRow(
-                        label = "Longest song streak",
-                        value = "${soundCapsule.listeningDayStreak} days",
-                        useLargerIcon = true,
-                        textColor = Color.White // Sesuaikan warna teks jika perlu
-                    )
-                }
-
-                // Streak Section
-                if (soundCapsule.streakSongs.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    // Check if we have a top streak song (played for 2+ days)
-                    if (soundCapsule.topStreakSong != null) {
-                        val topStreakSong = soundCapsule.topStreakSong
-                        Text(
-                            text = "Top Streak Song",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.White
+                    Column(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        DetailRow(
+                            label = "Longest song streak",
+                            value = "${soundCapsule.listeningDayStreak} days",
+                            useLargerIcon = true,
+                            textColor = Color.White
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
                         
-                        // Show only the top streak song with info that it's been played consistently
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF383838))
-                        ) {
-                            Row(
+                        // Streak Song Section (inside the same card)
+                        if (soundCapsule.streakSongs.isNotEmpty() && soundCapsule.topStreakSong != null) {
+                            val topStreakSong = soundCapsule.topStreakSong
+                            
+                            Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF383838))
                             ) {
-                                // Song Artwork
-                                AsyncImage(
-                                    model = topStreakSong.artwork,
-                                    contentDescription = "Song artwork",
+                                Box(
                                     modifier = Modifier
-                                        .size(70.dp)
-                                        .clip(RoundedCornerShape(4.dp)),
-                                    contentScale = ContentScale.Crop,
-                                    placeholder = painterResource(id = R.drawable.music_placeholder),
-                                    error = painterResource(id = R.drawable.music_placeholder)
-                                )
-                                
-                                Spacer(modifier = Modifier.width(12.dp))
-                                
-                                Column(
-                                    modifier = Modifier.weight(1f)
+                                        .fillMaxWidth()
                                 ) {
-                                    // Song Name
-                                    Text(
-                                        text = topStreakSong.name ?: "Unknown Song",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = Color.White,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                    // Full artwork as background
+                                    AsyncImage(
+                                        model = topStreakSong.artwork,
+                                        contentDescription = "Song artwork",
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .fillMaxHeight(),
+                                        contentScale = ContentScale.Crop,
+                                        placeholder = painterResource(id = R.drawable.music_placeholder),
+                                        error = painterResource(id = R.drawable.music_placeholder)
                                     )
                                     
-                                    // Artist Name
-                                    Text(
-                                        text = topStreakSong.artist ?: "Unknown Artist",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = Color.Gray,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    
-
+                                    // Gradient overlay and text at bottom
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .align(Alignment.BottomCenter)
+                                            .background(
+                                                brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                                    colors = listOf(
+                                                        Color.Transparent,
+                                                        Color.Black.copy(alpha = 0.7f),
+                                                        Color.Black.copy(alpha = 0.9f)
+                                                    )
+                                                )
+                                            )
+                                            .padding(12.dp)
+                                    ) {
+                                        Text(
+                                            text = "You had a ${soundCapsule.listeningDayStreak}-day streak",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = Color(0xFF4CAF50),
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        
+                                        Text(
+                                            text = "You played ${topStreakSong.name} by ${topStreakSong.artist} day after day. You were on fire!",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = Color.White,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        
+                                        Text(
+                                            text = topStreakSong.name ?: "Unknown Song",
+                                            style = MaterialTheme.typography.titleLarge,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        
+                                        Text(
+                                            text = topStreakSong.artist ?: "Unknown Artist",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = Color.White.copy(alpha = 0.8f),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
                             }
+                        } else {
+                            Text(
+                                text = "No consistent listening pattern detected yet",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.Gray,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                            )
                         }
-                    } else {
-                        // If no top streak song, display a message
-                        Text(
-                            text = "No consistent listening pattern detected yet",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.Gray
-                        )
                     }
                 }
             } else {
@@ -375,14 +397,14 @@ fun TopArtistSongCard(
                 color = textColor,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                textAlign = TextAlign.Center
             )
             if (!artistName.isNullOrEmpty() && title == "Top song") {
                 Text(
                     text = artistName,
                     color = textColor.copy(alpha = 0.7f),
                     fontSize = 12.sp,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    textAlign = TextAlign.Center
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))

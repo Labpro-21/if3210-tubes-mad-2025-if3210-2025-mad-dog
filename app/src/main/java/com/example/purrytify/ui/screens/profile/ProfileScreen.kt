@@ -282,7 +282,8 @@ fun ProfileScreen(
                                     // For older versions, request permission
                                     permissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                                 }
-                            }
+                            },
+                            modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
@@ -305,7 +306,8 @@ fun ProfileScreen(
                                 // For older versions, request permission
                                 permissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                             }
-                        }
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
