@@ -32,23 +32,45 @@ Kotlin Standard Library:
     Kotlin Script Runtime
 
 ## Screenshots
-### Portrain Screenshots
-<img src="screenshots/home.jpg" width="300">
-<img src="screenshots/lib1.jpg" width="300">
-<img src="screenshots/lib3.jpg" width="300">
-<img src="screenshots/lib_add.jpg" width="300">
-<img src="screenshots/detail1.jpg" width="300">
-<img src="screenshots/detail2.jpg" width="300">
-<img src="screenshots/edit_detail.jpg" width="300">
-<img src="screenshots/profil.jpg" width="300">
 
-### Landscape Screenshots
+### Home and Library Features
+<div style="display: flex; flex-wrap: wrap; gap: 10px;">
+    <img src="screenshots/milestone2/home1.jpg" width="280" alt="Home Screen 1">
+    <img src="screenshots/milestone2/home2.jpg" width="280" alt="Home Screen 2">
+    <img src="screenshots/milestone2/library.jpg" width="280" alt="Library Screen">
+</div>
 
-![alt image](screenshots/home_landscape.jpg)
-![alt image](screenshots/lib_landscape.jpg)
-![alt image](screenshots/detail_landscape.jpg)
-![alt image](screenshots/detail_landscape_edit.jpg)
-![alt image](screenshots/profil_landscape.jpg)
+### Profile and User Features
+<div style="display: flex; flex-wrap: wrap; gap: 10px;">
+    <img src="screenshots/milestone2/profile1.jpg" width="280" alt="Profile Screen 1">
+    <img src="screenshots/milestone2/profile2.jpg" width="280" alt="Profile Screen 2">
+    <img src="screenshots/milestone2/edit_profile.jpg" width="280" alt="Edit Profile">
+</div>
+
+### Music and Album Features
+<div style="display: flex; flex-wrap: wrap; gap: 10px;">
+    <img src="screenshots/milestone2/album3.jpg" width="280" alt="Album View">
+    <img src="screenshots/milestone2/online_song_detail1.jpg" width="280" alt="Song Detail">
+    <img src="screenshots/milestone2/audio_routing.jpg" width="280" alt="Audio Controls">
+</div>
+
+### Additional Features
+<div style="display: flex; flex-wrap: wrap; gap: 10px;">
+    <img src="screenshots/milestone2/map.jpg" width="280" alt="Location Map">
+    <img src="screenshots/milestone2/stats.jpg" width="280" alt="Statistics">
+    <img src="screenshots/milestone2/notification.jpg" width="280" alt="Notifications">
+</div>
+
+### Responsive Design
+<div style="display: flex; flex-wrap: wrap; gap: 10px;">
+    <img src="screenshots/milestone2/responsive1.jpg" width="400" alt="Responsive Design 1">
+    <img src="screenshots/milestone2/responsive2.jpg" width="400" alt="Responsive Design 2">
+</div>
+
+### Social Features
+<div style="display: flex; flex-wrap: wrap; gap: 10px;">
+    <img src="screenshots/milestone2/qr_share.jpg" width="280" alt="QR Sharing">
+</div>
 
 ## Pembagian Kerja
 
